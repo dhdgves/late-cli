@@ -306,6 +306,11 @@ func (t ShellTool) Execute(ctx context.Context, args json.RawMessage) (result st
 	// Execute command using a platform-specific shell wrapper.
 	cmd := newShellCommand(ctx, params.Command)
 	cmd.Dir = params.Cwd
+	// Force Python (and anything else inheriting the env) to use UTF-8
+	// I/O encoding.  Without this, CP936/GBK is the default on Chinese
+	// Windows, and the TUI renderer chokes on the non-UTF-8 bytes even
+	// after DetectAndConvert.
+	cmd.Env = append(os.Environ(), "PYTHONIOENCODING=utf-8")
 
 	output, err := cmd.CombinedOutput()
 
