@@ -26,7 +26,6 @@ type BackendType string
 const (
 	BackendUnknown       BackendType = "unknown"
 	BackendLlamaCPP      BackendType = "llama.cpp"
-	BackendLMStudio      BackendType = "lm-studio"
 	BackendGenericOpenAI BackendType = "openai"
 )
 
@@ -327,40 +326,6 @@ func (c *Client) DiscoverBackend(ctx context.Context) BackendType {
 	}
 	resp.Body.Close()
 
-	// Not llama.cpp — probe LM Studio's native /api/v1/models endpoint.
-	// This returns { "models": [...] } with "publisher" and "type":"llm" fields,
-	// which is unique to LM Studio and never returned by OpenAI-compatible servers.
-	modelsURL := strings.TrimSuffix(c.cfg.BaseURL, "/") + "/api/v1/models"
-	modelsReq, err := http.NewRequestWithContext(ctx, "GET", modelsURL, nil)
-	if err != nil {
-		c.backend = BackendGenericOpenAI
-		return c.backend
-	}
-	if c.cfg.APIKey != "" {
-		modelsReq.Header.Set("Authorization", "Bearer "+c.cfg.APIKey)
-	}
-
-	modelsResp, err := c.httpClient.Do(modelsReq)
-	if err != nil {
-		c.backend = BackendGenericOpenAI
-		return c.backend
-	}
-	defer modelsResp.Body.Close()
-
-	if modelsResp.StatusCode == http.StatusOK {
-		// LM Studio native format: top-level "models" key (not OpenAI's "data")
-		var lmStudioData struct {
-			Models []struct {
-				Type      string `json:"type"`
-				Publisher string `json:"publisher"`
-			} `json:"models"`
-		}
-		if err := json.NewDecoder(modelsResp.Body).Decode(&lmStudioData); err == nil && len(lmStudioData.Models) > 0 {
-			c.backend = BackendLMStudio
-			return c.backend
-		}
-	}
-
 	c.backend = BackendGenericOpenAI
 	return c.backend
 }
@@ -381,12 +346,6 @@ func (c *Client) IsLlamaCPP() bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.backend == BackendLlamaCPP
-}
-
-func (c *Client) IsLMStudio() bool {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.backend == BackendLMStudio
 }
 
 func (c *Client) SupportsVision() bool {
