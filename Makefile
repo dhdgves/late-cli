@@ -1,7 +1,7 @@
 .PHONY: build test clean install run help
 
 # Project variables
-BINARY_NAME=late
+BINARY_NAME=late-cli.exe
 VERSION?=1.3.0
 
 # Go compiler flags
