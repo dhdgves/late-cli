@@ -52,18 +52,18 @@ func (t ScriptTool) Execute(ctx context.Context, args json.RawMessage) (result s
 		return "", err
 	}
 
-	// Build the shell command: "python3 script.py arg1 arg2" etc.
-	// This delegates to the same platform-aware shell wrapper used by
-	// the bash tool — no hardcoded interpreter names, no .exe suffixes.
+	// Build the shell command: "python script.py arg1 arg2" etc.
+	// Routes through the same platform-aware shell wrapper used by
+	// the bash tool — no hardcoded interpreter paths, no .exe suffixes.
 	ext := filepath.Ext(t.ScriptPath)
 	var command string
 	switch ext {
 	case ".py":
-		command = fmt.Sprintf("python3 %s %s", shellQuote(t.ScriptPath), strings.Join(params.Args, " "))
+		command = buildShellCommand("python", t.ScriptPath, params.Args)
 	case ".js":
-		command = fmt.Sprintf("node %s %s", shellQuote(t.ScriptPath), strings.Join(params.Args, " "))
+		command = buildShellCommand("node", t.ScriptPath, params.Args)
 	default:
-		command = fmt.Sprintf("%s %s", shellQuote(t.ScriptPath), strings.Join(params.Args, " "))
+		command = buildShellCommand(t.ScriptPath, "", params.Args)
 	}
 
 	cmd := newShellCommand(ctx, command)
@@ -83,6 +83,37 @@ func (t ScriptTool) RequiresConfirmation(args json.RawMessage) bool {
 // shellQuote wraps a path in double quotes, safe for both Unix and Windows shells.
 func shellQuote(s string) string {
 	return "\"" + s + "\""
+}
+
+// buildShellCommand constructs a shell-safe command string.
+// interpreter is the binary name (e.g. "python", "node"); scriptPath is
+// always quoted; each arg is individually quoted if it contains spaces
+// or backslashes.
+func buildShellCommand(interpreter, scriptPath string, args []string) string {
+	var b strings.Builder
+	if interpreter != "" {
+		b.WriteString(interpreter)
+		b.WriteByte(' ')
+	}
+	b.WriteString(shellQuote(scriptPath))
+	for _, a := range args {
+		b.WriteByte(' ')
+		if needsQuoting(a) {
+			b.WriteString(shellQuote(a))
+		} else {
+			b.WriteString(a)
+		}
+	}
+	return b.String()
+}
+
+func needsQuoting(s string) bool {
+	for _, c := range s {
+		if c == ' ' || c == '\\' || c == '"' || c == '\'' || c == '$' || c == '`' {
+			return true
+		}
+	}
+	return false
 }
 
 func (t ScriptTool) CallString(args json.RawMessage) string {
