@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"late/internal/common"
 	"late/internal/skill"
-	"os"
-	"path/filepath"
 	"strings"
 )
 
@@ -60,47 +58,14 @@ func (t ActivateSkillTool) Execute(ctx context.Context, args json.RawMessage) (s
 		return fmt.Sprintf("Skill '%s' not found", params.Name), nil
 	}
 
-	// Resolve both ${{SKILL_DIR}} (late-cli style) and bare SKILL_DIR
-	// (WorkBuddy skill style) placeholders so the agent always sees
-	// absolute paths in the instructions.
+	// Resolve placeholders so the agent sees absolute paths — exactly
+	// as WorkBuddy does. Both ${{SKILL_DIR}} and bare SKILL_DIR are
+	// supported for compatibility.
 	instructions := s.Instructions
 	instructions = strings.ReplaceAll(instructions, "${{SKILL_DIR}}", s.Path)
 	instructions = strings.ReplaceAll(instructions, "SKILL_DIR", s.Path)
 
-	// List available scripts but do NOT register them as tools.
-	// The agent invokes scripts via the bash tool, which respects
-	// workstation constraints (conda env, custom interpreters, etc.).
-	scriptsDir := filepath.Join(s.Path, "scripts")
-	var scriptsSection string
-	if entries, err := os.ReadDir(scriptsDir); err == nil {
-		var scriptPaths []string
-		for _, entry := range entries {
-			if !entry.IsDir() {
-				scriptPath := filepath.Join(scriptsDir, entry.Name())
-				scriptPaths = append(scriptPaths, scriptPath)
-			}
-		}
-		if len(scriptPaths) > 0 {
-			var sb strings.Builder
-			sb.WriteString("\nAvailable scripts (invoke via the bash tool):\n")
-			for _, sp := range scriptPaths {
-				sb.WriteString(fmt.Sprintf("  - %s\n", sp))
-			}
-			sb.WriteString("\nChoose the correct interpreter for your environment")
-			sb.WriteString(" (python/node/etc.) and construct the bash command accordingly.")
-			scriptsSection = sb.String()
-		}
-	}
-
-	return fmt.Sprintf(
-		"Skill '%s' activated.\n\n"+
-			"Skill Directory: %s\n"+
-			"Instructions:\n%s%s",
-		s.Metadata.Name,
-		s.Path,
-		instructions,
-		scriptsSection,
-	), nil
+	return instructions, nil
 }
 
 func (t ActivateSkillTool) RequiresConfirmation(args json.RawMessage) bool { return false }
