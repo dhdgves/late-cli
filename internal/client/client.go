@@ -26,6 +26,7 @@ type BackendType string
 const (
 	BackendUnknown       BackendType = "unknown"
 	BackendLlamaCPP      BackendType = "llama.cpp"
+	BackendLMStudio      BackendType = "lm-studio"
 	BackendGenericOpenAI BackendType = "openai"
 )
 
@@ -68,7 +69,7 @@ func (c *Client) chatCompletionURL() string {
 
 // ChatCompletion sends a chat prompt to the OpenAI-compatible endpoint.
 func (c *Client) ChatCompletion(ctx context.Context, req ChatCompletionRequest) (*ChatCompletionResponse, error) {
-	if c.getBackend() == BackendUnknown || (c.getBackend() == BackendLlamaCPP && c.ContextSize() == -1) {
+	if c.getBackend() == BackendUnknown || c.getBackend() == BackendGenericOpenAI || (c.getBackend() == BackendLlamaCPP && c.ContextSize() == -1) {
 		_ = c.DiscoverBackend(ctx)
 	}
 
@@ -119,7 +120,7 @@ func (c *Client) ChatCompletionStream(ctx context.Context, req ChatCompletionReq
 		defer close(out)
 		defer close(errCh)
 
-		if c.getBackend() == BackendUnknown || (c.getBackend() == BackendLlamaCPP && c.ContextSize() == -1) {
+		if c.getBackend() == BackendUnknown || c.getBackend() == BackendGenericOpenAI || (c.getBackend() == BackendLlamaCPP && c.ContextSize() == -1) {
 			_ = c.DiscoverBackend(ctx)
 		}
 
@@ -279,7 +280,7 @@ func (c *Client) RefreshContextSize(ctx context.Context) {
 // DiscoverBackend probes certain endpoints to identify the inference engine.
 func (c *Client) DiscoverBackend(ctx context.Context) BackendType {
 	c.mu.RLock()
-	if c.backend == BackendLlamaCPP && c.ctxSize != -1 {
+	if c.backend != BackendUnknown && c.backend != BackendGenericOpenAI {
 		b := c.backend
 		c.mu.RUnlock()
 		return b
@@ -290,10 +291,11 @@ func (c *Client) DiscoverBackend(ctx context.Context) BackendType {
 	defer c.mu.Unlock()
 
 	// Double-check
-	if c.backend == BackendLlamaCPP && c.ctxSize != -1 {
+	if c.backend != BackendUnknown && c.backend != BackendGenericOpenAI {
 		return c.backend
 	}
 
+	// Try /props first (llama.cpp)
 	url := strings.TrimSuffix(c.cfg.BaseURL, "/") + "/props"
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
@@ -310,7 +312,6 @@ func (c *Client) DiscoverBackend(ctx context.Context) BackendType {
 		// Connection error: remain unknown to allow retry
 		return c.backend
 	}
-	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusOK {
 		c.backend = BackendLlamaCPP
@@ -319,11 +320,49 @@ func (c *Client) DiscoverBackend(ctx context.Context) BackendType {
 			c.ctxSize = props.DefaultGenerationSettings.NCtx
 			c.supportsVision = props.Modalities.Vision
 		}
-	} else {
-		// If we got a response but it's not OK, it's likely a standard OpenAI endpoint
+		resp.Body.Close()
+		return c.backend
+	}
+	resp.Body.Close()
+
+	// Not llama.cpp — probe /v1/models for LM Studio signature
+	modelsURL := strings.TrimSuffix(c.cfg.BaseURL, "/") + "/v1/models"
+	modelsReq, err := http.NewRequestWithContext(ctx, "GET", modelsURL, nil)
+	if err != nil {
 		c.backend = BackendGenericOpenAI
+		return c.backend
+	}
+	if c.cfg.APIKey != "" {
+		modelsReq.Header.Set("Authorization", "Bearer "+c.cfg.APIKey)
 	}
 
+	modelsResp, err := c.httpClient.Do(modelsReq)
+	if err != nil {
+		c.backend = BackendGenericOpenAI
+		return c.backend
+	}
+	defer modelsResp.Body.Close()
+
+	if modelsResp.StatusCode == http.StatusOK {
+		// LM Studio returns "owned_by": "lm-studio" in model entries
+		var modelsData struct {
+			Data []struct {
+				ID      string `json:"id"`
+				OwnedBy string `json:"owned_by"`
+			} `json:"data"`
+		}
+		if err := json.NewDecoder(modelsResp.Body).Decode(&modelsData); err == nil {
+			for _, model := range modelsData.Data {
+				if strings.Contains(strings.ToLower(model.OwnedBy), "lm-studio") ||
+					strings.Contains(strings.ToLower(model.ID), "lm-studio") {
+					c.backend = BackendLMStudio
+					return c.backend
+				}
+			}
+		}
+	}
+
+	c.backend = BackendGenericOpenAI
 	return c.backend
 }
 
@@ -343,6 +382,12 @@ func (c *Client) IsLlamaCPP() bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.backend == BackendLlamaCPP
+}
+
+func (c *Client) IsLMStudio() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.backend == BackendLMStudio
 }
 
 func (c *Client) SupportsVision() bool {

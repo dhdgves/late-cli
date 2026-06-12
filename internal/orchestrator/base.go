@@ -208,8 +208,10 @@ func (o *BaseOrchestrator) Execute(text string) (string, error) {
 		o.eventCh <- common.StatusEvent{ID: o.id, Status: "idle"}
 	}()
 
-	// Build extra body
-	var extraBody map[string]any
+	// Build extra body with session identifier for cache-aware backends (e.g. LM Studio).
+	extraBody := map[string]any{
+		"session_id": o.id,
+	}
 
 	onStartTurn := func() {
 		o.RefreshContextSize(ctx)
@@ -307,8 +309,10 @@ func (o *BaseOrchestrator) run() {
 			o.eventCh <- common.ContentEvent{ID: o.id, Usage: usage}
 		}
 
-		// Build extra body
-		var extraBody map[string]any
+		// Build extra body with session identifier for cache-aware backends (e.g. LM Studio).
+		extraBody := map[string]any{
+			"session_id": o.id,
+		}
 
 		_, err := executor.RunLoop(
 			ctx,

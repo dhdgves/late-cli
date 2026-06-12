@@ -25,7 +25,7 @@ func (t ScriptTool) Name() string {
 }
 
 func (t ScriptTool) Description() string {
-	return fmt.Sprintf("Execute the '%s' script from the '%s' skill.", t.ScriptName, t.SkillName)
+	return fmt.Sprintf("Execute the '%s' script from the '%s' skill. Script path: %s", t.ScriptName, t.SkillName, t.ScriptPath)
 }
 
 func (t ScriptTool) Parameters() json.RawMessage {
@@ -136,7 +136,39 @@ func (t ActivateSkillTool) Execute(ctx context.Context, args json.RawMessage) (s
 		}
 	}
 
-	return fmt.Sprintf("Skill '%s' activated.\n\nInstructions:\n%s", s.Metadata.Name, s.Instructions), nil
+	// Resolve ${{SKILL_DIR}} placeholders in the skill instructions so the
+	// agent knows the absolute file-system location of the skill directory.
+	// Without this, scripts/, references/, and assets/ paths in SKILL.md
+	// are unresolvable by read_file and bash tools.
+	instructions := strings.ReplaceAll(s.Instructions, "${{SKILL_DIR}}", s.Path)
+
+	scriptsInfo := ""
+	if entries, err := os.ReadDir(scriptsDir); err == nil {
+		var names []string
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				names = append(names, entry.Name())
+			}
+		}
+		if len(names) > 0 {
+			scriptsInfo = fmt.Sprintf("\nActive scripts:\n")
+			for _, name := range names {
+				scriptsInfo += fmt.Sprintf("  - %s (tool: skill_%s_%s)\n", name, s.Metadata.Name, sanitizeToolName(name))
+			}
+		}
+	}
+
+	return fmt.Sprintf(
+		"Skill '%s' activated.\n\n"+
+			"Skill Directory: %s\n"+
+			"Scripts Directory: %s%s\n"+
+			"Instructions:\n%s",
+		s.Metadata.Name,
+		s.Path,
+		scriptsDir,
+		scriptsInfo,
+		instructions,
+	), nil
 }
 
 func (t ActivateSkillTool) RequiresConfirmation(args json.RawMessage) bool { return false }
