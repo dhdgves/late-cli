@@ -1,14 +1,20 @@
 package tool
 
 import (
+	"bytes"
 	"context"
 	"encoding/json" // used for hash generation
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"runtime"
 	"strings"
 	"time"
+	"unicode/utf8"
+
+	"golang.org/x/text/encoding/simplifiedchinese"
+	"golang.org/x/text/transform"
 
 	"late/internal/common"
 	"late/internal/tool/ast"
@@ -314,6 +320,11 @@ func (t ShellTool) Execute(ctx context.Context, args json.RawMessage) (string, e
 		return "(binary output detected)", nil
 	}
 
+	// Detect and convert legacy encodings (GBK on Chinese Windows) to UTF-8.
+	// PowerShell on zh-CN systems defaults to GBK (CP936) for console output,
+	// which produces invalid UTF-8 byte sequences that break the TUI renderer.
+	output = sanitizeShellOutput(output)
+
 	outputStr := string(output)
 	truncated := false
 
@@ -344,6 +355,27 @@ func (t ShellTool) Execute(ctx context.Context, args json.RawMessage) (string, e
 
 	return finalOutput, nil
 }
+
+// sanitizeShellOutput detects whether raw shell output is valid UTF-8.
+// If not, it attempts GBK→UTF-8 conversion (the default codepage on
+// Chinese Windows).  Falls back to replacing invalid bytes with the
+// Unicode replacement character.
+func sanitizeShellOutput(raw []byte) []byte {
+	if utf8.Valid(raw) {
+		return raw
+	}
+
+	// Try GBK (CP936) → UTF-8
+	decoder := simplifiedchinese.GBK.NewDecoder()
+	decoded, err := io.ReadAll(transform.NewReader(bytes.NewReader(raw), decoder))
+	if err == nil {
+		return decoded
+	}
+
+	// Last resort: replace invalid bytes
+	return []byte(strings.ToValidUTF8(string(raw), "\ufffd"))
+}
+
 func (t ShellTool) RequiresConfirmation(args json.RawMessage) bool {
 	var params struct {
 		Command string `json:"command"`
