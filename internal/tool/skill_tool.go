@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -37,7 +38,16 @@ func (t ScriptTool) Parameters() json.RawMessage {
 	}`)
 }
 
-func (t ScriptTool) Execute(ctx context.Context, args json.RawMessage) (string, error) {
+func (t ScriptTool) Execute(ctx context.Context, args json.RawMessage) (result string, execErr error) {
+	// Catch panics from platform-specific script execution or encoding
+	// so a single bad script never takes down the agent.
+	defer func() {
+		if r := recover(); r != nil {
+			result = ""
+			execErr = fmt.Errorf("script tool panicked: %v", r)
+		}
+	}()
+
 	var params struct {
 		Args []string `json:"args"`
 	}
@@ -45,26 +55,80 @@ func (t ScriptTool) Execute(ctx context.Context, args json.RawMessage) (string, 
 		return "", err
 	}
 
-	// Determine how to run the script based on extension
+	// Determine how to run the script based on extension.
 	ext := filepath.Ext(t.ScriptPath)
-	var cmd *exec.Cmd
+	interpreter := resolveInterpreter(ext)
+	if interpreter == "" {
+		// No known interpreter — assume the script is directly executable
+		// (e.g. .sh on Unix, .ps1 on Windows via assoc).
+		interpreter = t.ScriptPath
+		params.Args = nil
+	}
 
-	switch ext {
-	case ".py":
-		cmd = exec.CommandContext(ctx, "python3", append([]string{t.ScriptPath}, params.Args...)...)
-	case ".js":
-		cmd = exec.CommandContext(ctx, "node", append([]string{t.ScriptPath}, params.Args...)...)
-	default:
-		// Assume it's an executable or shell script
-		cmd = exec.CommandContext(ctx, t.ScriptPath, params.Args...)
+	var cmd *exec.Cmd
+	if interpreter == t.ScriptPath {
+		cmd = exec.CommandContext(ctx, interpreter, params.Args...)
+	} else {
+		cmd = exec.CommandContext(ctx, interpreter, append([]string{t.ScriptPath}, params.Args...)...)
 	}
 
 	output, err := cmd.CombinedOutput()
+
+	// Convert legacy encodings before returning to the TUI.
+	output = DetectAndConvert(output)
+
 	if err != nil {
 		return fmt.Sprintf("Script failed with error: %v\nOutput: %s", err, string(output)), nil
 	}
 
 	return string(output), nil
+}
+
+// resolveInterpreter returns the path to the interpreter for the given
+// script extension, resolving platform-specific binary names.
+// Returns "" if the extension is unknown.
+func resolveInterpreter(ext string) string {
+	switch ext {
+	case ".py":
+		return resolvePython()
+	case ".js":
+		return resolveNode()
+	default:
+		return ""
+	}
+}
+
+// resolvePython finds a usable Python 3 interpreter.
+// On Unix: python3 → python → python3 (bare string, let exec fail)
+// On Windows: python3.exe → python.exe → python (let exec fail)
+func resolvePython() string {
+	if runtime.GOOS == "windows" {
+		for _, name := range []string{"python3.exe", "python.exe"} {
+			if p, err := exec.LookPath(name); err == nil {
+				return p
+			}
+		}
+		return "python.exe"
+	}
+	for _, name := range []string{"python3", "python"} {
+		if p, err := exec.LookPath(name); err == nil {
+			return p
+		}
+	}
+	return "python3"
+}
+
+// resolveNode finds a usable Node.js interpreter.
+func resolveNode() string {
+	if p, err := exec.LookPath("node"); err == nil {
+		return p
+	}
+	if runtime.GOOS == "windows" {
+		if p, err := exec.LookPath("node.exe"); err == nil {
+			return p
+		}
+	}
+	return "node"
 }
 
 func (t ScriptTool) RequiresConfirmation(args json.RawMessage) bool {
