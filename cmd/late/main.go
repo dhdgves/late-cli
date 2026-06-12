@@ -139,6 +139,10 @@ func main() {
 		systemPrompt = systemPrompt + *appendSystemPromptReq
 	}
 
+	// Inject current date/time so the model has accurate temporal context
+	// without needing to invoke a tool to discover it.
+	systemPrompt += fmt.Sprintf("\n\nCurrent date: %s", time.Now().Format("Monday, January 2, 2006"))
+
 	startMsg := "Starting late TUI..."
 	if tool.IsSqzAvailable() {
 		startMsg = "Starting late TUI (sqz-enabled)..."
