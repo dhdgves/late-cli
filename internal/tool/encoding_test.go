@@ -152,6 +152,93 @@ func TestDetectAndConvert_Idempotent(t *testing.T) {
 	}
 }
 
+func TestDetectAndConvert_Emoji(t *testing.T) {
+	// Emojis are 4-byte UTF-8 sequences; verify they survive intact.
+	cases := []struct {
+		name  string
+		input string
+	}{
+		{"single-emoji", "😀"},
+		{"multiple-emoji", "🚀✅💯"},
+		{"emoji-with-text", "Build: ✅ 3 passed, ❌ 1 failed"},
+		{"shell-git-log", "📦 chore: bump version to 1.3.0"},
+		{"emoji-at-start", "🔍 Searching..."},
+		{"emoji-at-end", "Done! 🎉"},
+		{"emoji-only-lines", "✅\n❌\n⏳"},
+		{"skin-tone", "👋🏽 hello"},
+		{"flag-emoji", "🇨🇳 中国 🇺🇸 USA"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			input := []byte(tc.input)
+			if !utf8.Valid(input) {
+				t.Skip("test data not valid UTF-8 — skip")
+			}
+			got := DetectAndConvert(input)
+			if string(got) != tc.input {
+				t.Errorf("emoji pass-through failed\n  got:  %q\n  want: %q", got, tc.input)
+			}
+			if !utf8.Valid(got) {
+				t.Errorf("output must be valid UTF-8: %q", got)
+			}
+		})
+	}
+}
+
+func TestDetectAndConvert_GBK_ThenUTF8_EmojiPreserved(t *testing.T) {
+	// Realistic scenario: GBK system messages on one line, then
+	// piped UTF-8 output (with emoji) on the next line.
+	// Line 1: GBK "生成报告: 开始处理..."
+	// Line 2: UTF-8 "✅ done (3 files)"
+	gbkLine := []byte{0xc9, 0xfa, 0xb3, 0xc9, 0xb1, 0xa8, 0xb8, 0xe6, 0x3a, 0x20, 0xbf, 0xaa, 0xca, 0xbc, 0xb4, 0xa6, 0xc0, 0xed, 0x2e, 0x2e, 0x2e}
+	utf8Line := []byte("✅ done (3 files)")
+
+	input := make([]byte, 0, len(gbkLine)+1+len(utf8Line))
+	input = append(input, gbkLine...)
+	input = append(input, '\n')
+	input = append(input, utf8Line...)
+
+	if utf8.Valid(input) {
+		t.Skip("mixed GBK+UTF-8 accidentally valid UTF-8")
+	}
+
+	got := DetectAndConvert(input)
+	if !utf8.Valid(got) {
+		t.Fatalf("output must be valid UTF-8: %x", got)
+	}
+
+	s := string(got)
+	if !strings.Contains(s, "开始处理") {
+		t.Errorf("GBK line not decoded: %q", s)
+	}
+	if !strings.Contains(s, "✅") {
+		t.Errorf("emoji ✅ lost: %q", s)
+	}
+}
+
+func TestDetectAndConvert_EmojiInFuzzSet(t *testing.T) {
+	// Add emoji-heavy inputs to the fuzz-style valid-UTF8 check.
+	cases := [][]byte{
+		[]byte("😀"),
+		[]byte("🔍 searching... ✅"),
+		[]byte("🎉🎉🎉"),
+		[]byte("👨‍💻"), // ZWJ sequence (man technologist)
+		[]byte("📦 v1.0 🚀 v2.0 💥 v3.0"),
+		// Emoji at boundary of truncated sequence
+		[]byte("text😀"),   // text + 4-byte emoji (6 bytes total)
+		[]byte("😀text"),   // emoji at start
+		[]byte("\xf0\x9f"), // truncated emoji (leading bytes only, invalid UTF-8)
+	}
+
+	for i, c := range cases {
+		got := DetectAndConvert(c)
+		if !utf8.Valid(got) {
+			t.Errorf("case %d (%x): output not valid UTF-8: %x", i, c, got)
+		}
+	}
+}
+
 func TestDetectAndConvert_OnlyValidUTF8Returned(t *testing.T) {
 	// Fuzz-like: ensure output is always valid UTF-8 for a range of inputs.
 	cases := [][]byte{
