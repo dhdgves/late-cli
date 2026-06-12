@@ -60,9 +60,12 @@ func (t ActivateSkillTool) Execute(ctx context.Context, args json.RawMessage) (s
 		return fmt.Sprintf("Skill '%s' not found", params.Name), nil
 	}
 
-	// Resolve ${{SKILL_DIR}} placeholders so the agent knows the absolute
-	// file-system location of the skill directory.
-	instructions := strings.ReplaceAll(s.Instructions, "${{SKILL_DIR}}", s.Path)
+	// Resolve both ${{SKILL_DIR}} (late-cli style) and bare SKILL_DIR
+	// (WorkBuddy skill style) placeholders so the agent always sees
+	// absolute paths in the instructions.
+	instructions := s.Instructions
+	instructions = strings.ReplaceAll(instructions, "${{SKILL_DIR}}", s.Path)
+	instructions = strings.ReplaceAll(instructions, "SKILL_DIR", s.Path)
 
 	// List available scripts but do NOT register them as tools.
 	// The agent invokes scripts via the bash tool, which respects
