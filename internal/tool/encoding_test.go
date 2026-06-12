@@ -167,6 +167,9 @@ func TestDetectAndConvert_Emoji(t *testing.T) {
 		{"emoji-only-lines", "✅\n❌\n⏳"},
 		{"skin-tone", "👋🏽 hello"},
 		{"flag-emoji", "🇨🇳 中国 🇺🇸 USA"},
+		{"emoji-chinese-test-pass", "✅ 测试通过"},
+		{"emoji-chinese-test-fail", "❌ 测试失败: 3/10 cases"},
+		{"emoji-chinese-ci", "📊 覆盖率 87.3% ✅ 全部通过"},
 	}
 
 	for _, tc := range cases {
