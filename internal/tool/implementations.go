@@ -263,7 +263,16 @@ func (t ShellTool) Parameters() json.RawMessage {
 		"required": ["command"]
 	}`, shellDisplayName()))
 }
-func (t ShellTool) Execute(ctx context.Context, args json.RawMessage) (string, error) {
+func (t ShellTool) Execute(ctx context.Context, args json.RawMessage) (result string, execErr error) {
+	// Catch panics from platform-specific shell wrappers or encoding
+	// transcoding so a single bad codepath never takes down the agent.
+	defer func() {
+		if r := recover(); r != nil {
+			result = ""
+			execErr = fmt.Errorf("shell tool panicked: %v", r)
+		}
+	}()
+
 	var params struct {
 		Command string `json:"command"`
 		Cwd     string `json:"cwd"`
@@ -360,7 +369,14 @@ func (t ShellTool) Execute(ctx context.Context, args json.RawMessage) (string, e
 // If not, it attempts GBK→UTF-8 conversion (the default codepage on
 // Chinese Windows).  Falls back to replacing invalid bytes with the
 // Unicode replacement character.
-func sanitizeShellOutput(raw []byte) []byte {
+func sanitizeShellOutput(raw []byte) (out []byte) {
+	defer func() {
+		if r := recover(); r != nil {
+			// Encoding library panic — fall back to byte replacement.
+			out = []byte(strings.ToValidUTF8(string(raw), "\ufffd"))
+		}
+	}()
+
 	if utf8.Valid(raw) {
 		return raw
 	}
