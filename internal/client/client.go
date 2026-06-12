@@ -295,7 +295,9 @@ func (c *Client) DiscoverBackend(ctx context.Context) BackendType {
 		return c.backend
 	}
 
-	// Try /props first (llama.cpp)
+	// Try /props first (llama.cpp).  Some backends (e.g. LM Studio) return
+	// 200 for unknown endpoints with a non-props body, so we must validate
+	// the JSON AND n_ctx > 0 before accepting the llama.cpp classification.
 	url := strings.TrimSuffix(c.cfg.BaseURL, "/") + "/props"
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
@@ -314,19 +316,21 @@ func (c *Client) DiscoverBackend(ctx context.Context) BackendType {
 	}
 
 	if resp.StatusCode == http.StatusOK {
-		c.backend = BackendLlamaCPP
 		var props PropsResponse
-		if err := json.NewDecoder(resp.Body).Decode(&props); err == nil {
+		if err := json.NewDecoder(resp.Body).Decode(&props); err == nil && props.DefaultGenerationSettings.NCtx > 0 {
+			c.backend = BackendLlamaCPP
 			c.ctxSize = props.DefaultGenerationSettings.NCtx
 			c.supportsVision = props.Modalities.Vision
+			resp.Body.Close()
+			return c.backend
 		}
-		resp.Body.Close()
-		return c.backend
 	}
 	resp.Body.Close()
 
-	// Not llama.cpp — probe /v1/models for LM Studio signature
-	modelsURL := strings.TrimSuffix(c.cfg.BaseURL, "/") + "/v1/models"
+	// Not llama.cpp — probe LM Studio's native /api/v1/models endpoint.
+	// This returns { "models": [...] } with "publisher" and "type":"llm" fields,
+	// which is unique to LM Studio and never returned by OpenAI-compatible servers.
+	modelsURL := strings.TrimSuffix(c.cfg.BaseURL, "/") + "/api/v1/models"
 	modelsReq, err := http.NewRequestWithContext(ctx, "GET", modelsURL, nil)
 	if err != nil {
 		c.backend = BackendGenericOpenAI
@@ -344,21 +348,16 @@ func (c *Client) DiscoverBackend(ctx context.Context) BackendType {
 	defer modelsResp.Body.Close()
 
 	if modelsResp.StatusCode == http.StatusOK {
-		// LM Studio returns "owned_by": "lm-studio" in model entries
-		var modelsData struct {
-			Data []struct {
-				ID      string `json:"id"`
-				OwnedBy string `json:"owned_by"`
-			} `json:"data"`
+		// LM Studio native format: top-level "models" key (not OpenAI's "data")
+		var lmStudioData struct {
+			Models []struct {
+				Type      string `json:"type"`
+				Publisher string `json:"publisher"`
+			} `json:"models"`
 		}
-		if err := json.NewDecoder(modelsResp.Body).Decode(&modelsData); err == nil {
-			for _, model := range modelsData.Data {
-				if strings.Contains(strings.ToLower(model.OwnedBy), "lm-studio") ||
-					strings.Contains(strings.ToLower(model.ID), "lm-studio") {
-					c.backend = BackendLMStudio
-					return c.backend
-				}
-			}
+		if err := json.NewDecoder(modelsResp.Body).Decode(&lmStudioData); err == nil && len(lmStudioData.Models) > 0 {
+			c.backend = BackendLMStudio
+			return c.backend
 		}
 	}
 
