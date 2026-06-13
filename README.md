@@ -2,7 +2,7 @@
 
 [English](README.md) | [中文](README.zh-CN.md)
 
-> **Fork of [mlhher/late-cli](https://github.com/mlhher/late-cli)** — enhanced for Windows robustness and ruthless context management, inspired by [Terax AI](https://github.com/crynta/terax-ai). Single static binary, any model. Zero config, zero context bloat.
+> **Fork of [mlhher/late-cli](https://github.com/mlhher/late-cli)** — enhanced for Windows robustness and ruthless context management, inspired by [Terax AI](https://github.com/crynta/terax-ai) and [DeepSeek-Reasonix](https://github.com/deepseek-ai/reasonix). Single static binary, any model. Zero config, zero context bloat.
 >
 > Every other coding agent floods its own context with edits, retries and implementation details until the model loses the thread. Late delegates all of that to ephemeral subagents — isolated contexts that execute one task and are destroyed. The orchestrator sees only plans and outcomes, never the mess. Single static binary, zero dependencies, any model.
 
