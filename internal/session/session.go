@@ -145,12 +145,19 @@ func (s *Session) StartStream(ctx context.Context, extraBody map[string]any) (<-
 	outCh := make(chan common.StreamResult)
 	errCh := make(chan error, 1)
 
-	// Prepare messages with system prompt
-	messages := make([]client.ChatMessage, 0, len(s.History)+1)
+	// Prepare messages with system prompt.
+	// Apply ruthless context compaction before sending to keep the
+	// token count within the model's context window — critical for
+	// KV-cache-constrained local deployments (LM Studio, llama.cpp).
+	ctxLimit := s.client.ContextSize()
+	toolDefs := s.GetToolDefinitions()
+	history := CompactMessages(s.History, s.systemPrompt, toolDefs, ctxLimit)
+
+	messages := make([]client.ChatMessage, 0, len(history)+1)
 	if s.systemPrompt != "" {
 		messages = append(messages, client.ChatMessage{Role: "system", Content: client.TextContent(s.systemPrompt)})
 	}
-	messages = append(messages, s.History...)
+	messages = append(messages, history...)
 
 	req := client.ChatCompletionRequest{
 		Messages:  messages,
@@ -158,7 +165,7 @@ func (s *Session) StartStream(ctx context.Context, extraBody map[string]any) (<-
 	}
 
 	if s.useTools {
-		req.Tools = s.GetToolDefinitions()
+		req.Tools = toolDefs
 	}
 
 	streamOut, streamErr := s.client.ChatCompletionStream(ctx, req)
