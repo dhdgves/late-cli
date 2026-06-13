@@ -29,6 +29,9 @@ const (
 // history, reducing token count while preserving essential information.
 //
 // Pipeline:
+//  0. NormalizeMessages — repair tool-call pairing, reorder tool results,
+//     drop orphans, backfill placeholders. Ensures deterministic prefix
+//     for KV-cache reuse.
 //  1. dropSupersededReads — ALWAYS runs. Elides read_file results whose
 //     file was later mutated by write_file/target_edit. This is lossless.
 //  2. If still over compactSemantic threshold:
@@ -43,9 +46,8 @@ func CompactMessages(history []client.ChatMessage, systemPrompt string, tools []
 		return history // no context info, skip
 	}
 
-	// Work on a copy.
-	out := make([]client.ChatMessage, len(history))
-	copy(out, history)
+	// Stage 0: normalize message structure for deterministic KV-cache prefix.
+	out := NormalizeMessages(history)
 
 	// Stage 1: always run semantic elision — zero-cost, zero-risk.
 	out = dropSupersededReads(out)
