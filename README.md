@@ -51,6 +51,42 @@ Works with **Claude, DeepSeek, Qwen, Gemma (including thinking support for Gemma
 
 ---
 
+## This Fork — Enhanced for Local Deployments
+
+This fork adds Windows-first robustness and ruthless context management for KV-cache-constrained local inference backends (LM Studio, llama.cpp). All changes are tested against real multi-hour coding sessions.
+
+### Context Compaction (inspired by [Terax AI](https://github.com/crynta/terax-ai))
+
+Late now applies a compaction pipeline before every API call to keep the context window lean:
+
+- **dropSupersededReads** — always-on, lossless. When `write_file` or `target_edit` modifies a file, any prior `read_file` result for that same file is elided. The model never sees stale data.
+- **batchElideToolResults** — triggers when tokens exceed 70% of the context limit. Old tool-results are elided from the conversation head, preserving the last 24 messages (KEEP_TAIL).
+- **Token estimation** — lightweight heuristic (`bytes/4`), no real tokenizer overhead.
+
+Effect on a real 121-message coding session: **105K → 37K tokens (65% reduction)** under a 50% context limit.
+
+### Windows & Encoding Robustness
+
+- **Shell fallback chain**: `pwsh.exe → powershell.exe → cmd.exe` with graceful degradation.
+- **GBK→UTF-8 transcoding**: Shell output on Chinese Windows defaults to GBK (CP936). A per-line `DetectAndConvert` pipeline with 12 test functions ensures the TUI renderer never sees invalid UTF-8.
+- **`PYTHONIOENCODING=utf-8`**: Injected into every child process to prevent Python from emitting GBK in the first place.
+- **Panic recovery**: Shell tool and script execution are wrapped with `defer/recover` to prevent platform-specific crashes from taking down the agent.
+
+### Skill System
+
+- **`SKILL_DIR` compatibility**: Supports both `${{SKILL_DIR}}` (late-cli style) and bare `SKILL_DIR` (WorkBuddy style) in skill instructions.
+- **Script invocation via bash tool**: Skill scripts are no longer registered as separate tools. The agent invokes them through the regular `bash` tool, respecting workstation constraints (conda environments, custom interpreters).
+
+### Session Awareness
+
+- **`session_id` injection**: Every API request carries the orchestrator ID as `session_id` in `extra_body`, helping cache-aware backends associate consecutive requests.
+
+### System Prompt
+
+- **Current date injection**: The model always knows the current date without needing a tool call.
+
+---
+
 ## How It Works
 
 Standard coding agents do all their work, whether it's planning, implementing, retrying failed edits, or self-healing, in one shared context window. Every retry, every failed implementation, every repair loop pollutes the context the model reasons from. It degrades. You blame the model. The model is fine.
