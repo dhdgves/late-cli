@@ -179,9 +179,11 @@ type Timings struct {
 }
 
 type Usage struct {
-	PromptTokens     int `json:"prompt_tokens"`
-	CompletionTokens int `json:"completion_tokens"`
-	TotalTokens      int `json:"total_tokens"`
+	PromptTokens          int `json:"prompt_tokens"`
+	CompletionTokens      int `json:"completion_tokens"`
+	TotalTokens           int `json:"total_tokens"`
+	PromptCacheHitTokens  int `json:"prompt_cache_hit_tokens,omitempty"`  // DeepSeek: cache hits
+	PromptCacheMissTokens int `json:"prompt_cache_miss_tokens,omitempty"` // DeepSeek: cache misses
 }
 
 type PropsResponse struct {

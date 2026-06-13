@@ -81,7 +81,7 @@ func TestToolAdapterName_WithServerName(t *testing.T) {
 		mcpTool:    &sdkmcp.Tool{Name: "list_files"},
 		serverName: "graph-rag",
 	}
-	want := "graph-rag:list_files"
+	want := "graph-rag_list_files"
 	if got := adapter.Name(); got != want {
 		t.Errorf("Name() = %q, want %q", got, want)
 	}

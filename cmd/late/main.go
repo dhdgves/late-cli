@@ -233,18 +233,13 @@ func main() {
 	executor.RegisterTools(sess.Registry, enabledTools, true)
 
 	// Register MCP tools into the session registry.
-	// MCP tool names are now namespaced as "{server}:{tool}" (e.g. "graph-rag:list_files").
-	// For backwards compatibility with configs that disable tools by bare name
-	// (e.g. "list_files": false), we check the namespaced name first, then fall
-	// back to the bare name so existing configs keep working without modification.
+	// MCP tool names are namespaced as "{server}_{tool}" (e.g. "codegraph_codegraph_files").
 	for _, t := range mcpClient.GetTools() {
 		name := t.Name()
-		// Derive the bare name by stripping the server prefix.
 		bareName := name
-		if idx := strings.LastIndex(name, ":"); idx >= 0 {
+		if idx := strings.LastIndex(name, "_"); idx >= 0 {
 			bareName = name[idx+1:]
 		}
-		// Namespaced entry takes priority over bare-name entry.
 		if enabled, exists := enabledTools[name]; exists {
 			if !enabled {
 				continue

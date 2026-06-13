@@ -35,12 +35,12 @@ type ToolAdapter struct {
 	serverName string // the MCP server name from mcp_config.json
 }
 
-// Name returns the namespaced tool name in the form "{server}:{tool}".
-// Namespacing prevents allowed_tools.json collisions when multiple MCP
-// servers expose tools with the same bare name.
+// Name returns the namespaced tool name in the form "{server}_{tool}".
+// Uses _ instead of : as the separator — strict OpenAI-compatible APIs
+// (DeepSeek, OpenRouter) reject : in function names per ^[a-zA-Z0-9_-]+$.
 func (t *ToolAdapter) Name() string {
 	if t.serverName != "" {
-		return t.serverName + ":" + t.mcpTool.Name
+		return t.serverName + "_" + t.mcpTool.Name
 	}
 	return t.mcpTool.Name
 }
