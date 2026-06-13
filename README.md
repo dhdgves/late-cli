@@ -2,7 +2,7 @@
 
 [English](README.md) | [中文](README.zh-CN.md)
 
-> **Fork of [mlhher/late-cli](https://github.com/mlhher/late-cli)** — enhanced for Windows robustness and ruthless context management, inspired by [Terax AI](https://github.com/crynta/terax-ai) and [DeepSeek-Reasonix](https://github.com/deepseek-ai/reasonix). Single static binary, any model. Zero config, zero context bloat.
+> **Fork of [mlhher/late-cli](https://github.com/mlhher/late-cli).** Enhanced for local & cloud efficiency.
 >
 > Every other coding agent floods its own context with edits, retries and implementation details until the model loses the thread. Late delegates all of that to ephemeral subagents — isolated contexts that execute one task and are destroyed. The orchestrator sees only plans and outcomes, never the mess. Single static binary, zero dependencies, any model.
 
@@ -46,6 +46,42 @@ late
 > *"Late-CLI is mindblowing... I'm shocked that the token usage is so minimal, I keep expecting a big bill from DeepSeek's API."* — GitHub Discussions
 
 > [Outperforming Claude Code and Codex for Local LLM Workflows](https://agentnativedev.medium.com/outperforming-claude-code-and-codex-for-local-llm-workflows-5de0e2b1add5) — Agent Native
+
+> **Fork of [mlhher/late-cli](https://github.com/mlhher/late-cli).** Enhanced for local & cloud efficiency.
+
+---
+
+## This Fork — What's Different
+
+### 🔥 Ruthless Context Compaction · [Terax AI](https://github.com/crynta/terax-ai)
+
+Aggressively elides stale context before every API call. **Critical for VRAM-constrained local models (LM Studio, llama.cpp on 5–12 GB).**
+
+| Technique | Trigger | Effect |
+|-----------|---------|--------|
+| **dropSupersededReads** | Always-on | Elides `read_file` results superseded by later `write_file`/`target_edit` |
+| **batchElideToolResults** | Tokens > 70% limit | Trims old tool-results from head, preserving last 24 messages |
+| **stripOldReasoning** | Tokens > 70% limit | Clears reasoning content from assistant messages older than 12 turns |
+
+> Real 402-message session: **264K → 91K tokens (65% reduction).**
+
+### ⚡ Deterministic Prefix Normalization · [DeepSeek-Reasonix](https://github.com/deepseek-ai/reasonix)
+
+`NormalizeMessages` re-pairs tool results in call order, drops orphans, backfills missing results — producing a **stable message prefix that maximizes cloud API cache reuse.**
+
+> Measured on DeepSeek v4: **84–88% prefix cache hit rate** on consecutive turns. Cache hit rate displayed live in the TUI status bar.
+
+### 🪟 Windows Robustness
+
+- **Shell fallback**: pwsh → powershell → cmd
+- **GBK→UTF-8 transcoding**: Chinese console output properly converted
+- **`PYTHONIOENCODING=utf-8`**: injected into every child process
+- **Panic recovery** on shell/script execution
+
+### 🧩 Skill System
+
+- WorkBuddy-compatible `SKILL_DIR` substitution
+- Scripts invoked via shell tool — respects conda environments
 
 > **Built with Late:** Late is primarily developed inside Late itself.
 
