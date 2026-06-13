@@ -143,6 +143,33 @@ func TestDropSupersededReads_PreWriteElided_PostWriteSurvives(t *testing.T) {
 	}
 }
 
+func TestDropSupersededReads_MultiWrite_ReadBetweenWrites(t *testing.T) {
+	// write → read → write. The read result between two writes is stale
+	// (the second write invalidated it). lastMutation must catch this.
+	msgs := []client.ChatMessage{
+		msg("user", "fix foo.go"),
+		{Role: "assistant", ToolCalls: []client.ToolCall{
+			{ID: "call_w0", Function: client.FunctionCall{Name: "write_file", Arguments: `{"path":"foo.go"}`}},
+		}},
+		msgTool("call_w0", "wrote v1"),
+		msg("assistant", "let me check"),
+		{Role: "assistant", ToolCalls: []client.ToolCall{
+			{ID: "call_r1", Function: client.FunctionCall{Name: "read_file", Arguments: `{"path":"foo.go"}`}},
+		}},
+		msgTool("call_r1", "content v1"), // ← should be elided (second write invalidates)
+		msg("assistant", "need more changes"),
+		{Role: "assistant", ToolCalls: []client.ToolCall{
+			{ID: "call_w2", Function: client.FunctionCall{Name: "write_file", Arguments: `{"path":"foo.go"}`}},
+		}},
+		msgTool("call_w2", "wrote v2"),
+	}
+
+	result := dropSupersededReads(msgs)
+	if result[5].Content.String() != elisionMark {
+		t.Errorf("read between two writes should be elided: got %q", result[5].Content.String())
+	}
+}
+
 func TestDropSupersededReads_TargetEditSupersedes(t *testing.T) {
 	msgs := []client.ChatMessage{
 		msg("user", "read foo.go"),

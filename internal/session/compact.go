@@ -70,10 +70,11 @@ func CompactMessages(history []client.ChatMessage, systemPrompt string, tools []
 // later mutated (write_file/target_edit) or re-read more recently.
 // This is the most impactful single compression technique for coding agents.
 func dropSupersededReads(messages []client.ChatMessage) []client.ChatMessage {
-	// Phase A: collect the FIRST mutation index per path.
-	// A read is only superseded if a mutation (write_file/target_edit)
-	// happened AFTER that read. Boolean set loses temporal ordering.
-	firstMutation := make(map[string]int)
+	// Phase A: collect the LAST mutation index per path.
+	// A read is superseded only if a mutation (write_file/target_edit)
+	// happened AFTER that read. Using the last mutation handles the
+	// common case of multiple edits to the same file.
+	lastMutation := make(map[string]int)
 	for i, m := range messages {
 		if m.Role != "assistant" {
 			continue
@@ -86,12 +87,10 @@ func dropSupersededReads(messages []client.ChatMessage) []client.ChatMessage {
 			if p == "" {
 				continue
 			}
-			if _, exists := firstMutation[p]; !exists {
-				firstMutation[p] = i // first write/edit to this file
-			}
+			lastMutation[p] = i // always update to last mutation
 		}
 	}
-	if len(firstMutation) == 0 {
+	if len(lastMutation) == 0 {
 		return messages // nothing mutated, no superseded reads
 	}
 
@@ -130,8 +129,8 @@ func dropSupersededReads(messages []client.ChatMessage) []client.ChatMessage {
 		if !ok {
 			continue
 		}
-		// Elide if mutation index > read index (mutation happened AFTER this read)
-		if mtIdx, exists := firstMutation[path]; exists && mtIdx > i {
+		// Elide if last mutation index > read index (mutation happened AFTER this read)
+		if mtIdx, exists := lastMutation[path]; exists && mtIdx > i {
 			m.Content = client.TextContent(elisionMark)
 			continue
 		}
