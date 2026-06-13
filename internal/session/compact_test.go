@@ -266,6 +266,52 @@ func TestCompactMessages_ContextLimitZero(t *testing.T) {
 	}
 }
 
+func TestStripOldReasoning_PreservesRecent(t *testing.T) {
+	// 20 assistant messages, each with reasoning. Last keepReasoning=12 should survive.
+	msgs := make([]client.ChatMessage, 20)
+	for i := range msgs {
+		msgs[i] = client.ChatMessage{
+			Role:             "assistant",
+			Content:          client.TextContent("ok"),
+			ReasoningContent: "thinking about step " + string(rune('a'+i)),
+		}
+	}
+
+	result := stripOldReasoning(msgs)
+
+	// Last 12 assistants should have reasoning intact.
+	for i := 20 - keepReasoning; i < 20; i++ {
+		if result[i].ReasoningContent == "" {
+			t.Errorf("assistant %d: reasoning should be preserved, was cleared", i)
+		}
+	}
+
+	// First 8 (20-12) should have reasoning cleared.
+	cleared := 0
+	for i := 0; i < 20-keepReasoning; i++ {
+		if result[i].ReasoningContent == "" {
+			cleared++
+		}
+	}
+	if cleared != 8 {
+		t.Errorf("expected 8 cleared, got %d", cleared)
+	}
+}
+
+func TestStripOldReasoning_NonAssistantUntouched(t *testing.T) {
+	msgs := []client.ChatMessage{
+		msg("user", "hello"),
+		{Role: "assistant", Content: client.TextContent("hi"), ReasoningContent: "I should say hi"},
+		msgTool("t1", "result"),
+		{Role: "assistant", Content: client.TextContent("done"), ReasoningContent: "task complete"},
+	}
+	// Only 2 assistants — keepReasoning=12, so none should be cleared.
+	result := stripOldReasoning(msgs)
+	if result[1].ReasoningContent == "" {
+		t.Error("sole assistant reasoning should survive when count < keepReasoning")
+	}
+}
+
 func TestBatchElideToolResults_PreservesTail(t *testing.T) {
 	// Build a 30-message history of tool results to test KEEP_TAIL.
 	msgs := make([]client.ChatMessage, 30)

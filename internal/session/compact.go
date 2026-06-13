@@ -16,6 +16,11 @@ const (
 	// keepTail preserves the last N messages from batch elision.
 	keepTail = 24
 
+	// keepReasoning preserves reasoning content on the last K assistant
+	// messages.  Reasoning older than this was consumed in decisions
+	// already made and is dead weight.
+	keepReasoning = 12
+
 	// Elision mark replaces superseded tool results.
 	elisionMark = "[elided — see earlier in conversation]"
 )
@@ -26,8 +31,11 @@ const (
 // Pipeline:
 //  1. dropSupersededReads — ALWAYS runs. Elides read_file results whose
 //     file was later mutated by write_file/target_edit. This is lossless.
-//  2. If still over compactSemantic threshold, batch-elide old tool-results
-//     from the head, preserving the last keepTail messages.
+//  2. If still over compactSemantic threshold:
+//     a. stripOldReasoning — clear reasoning from assistant messages
+//        older than keepReasoning from the end
+//     b. batchElideToolResults — elide old tool-results from the head,
+//        preserving the last keepTail messages
 //
 // Returns a new slice; the input is never mutated.
 func CompactMessages(history []client.ChatMessage, systemPrompt string, tools []client.ToolDefinition, contextLimit int) []client.ChatMessage {
@@ -47,6 +55,10 @@ func CompactMessages(history []client.ChatMessage, systemPrompt string, tools []
 	if total < int(float64(contextLimit)*compactSemantic) {
 		return out
 	}
+
+	// Strip old reasoning before batch tool-result elision — it's
+	// the cheaper win (single field clear vs content replacement).
+	out = stripOldReasoning(out)
 	out = batchElideToolResults(out, contextLimit, systemPrompt, tools)
 
 	return out
@@ -121,7 +133,7 @@ func dropSupersededReads(messages []client.ChatMessage) []client.ChatMessage {
 // conversation until the token count drops below compactSemantic.
 // system messages and the last keepTail messages are never touched.
 func batchElideToolResults(messages []client.ChatMessage, contextLimit int, systemPrompt string, tools []client.ToolDefinition) []client.ChatMessage {
-	target := int(float64(contextLimit) * compactSemantic) // aim to get below 70%
+	target := int(float64(contextLimit) * compactSemantic)
 
 	stopIdx := len(messages) - keepTail
 	if stopIdx < 0 {
@@ -144,6 +156,37 @@ func batchElideToolResults(messages []client.ChatMessage, contextLimit int, syst
 		// Still over target — keep going. But if restoring would
 		// barely change anything (very short tool result), just keep it.
 		_ = old
+	}
+
+	return messages
+}
+
+// stripOldReasoning clears ReasoningContent from assistant messages older
+// than keepReasoning from the end of the conversation.  The model only
+// needs recent reasoning to maintain continuity; reasoning about decisions
+// long since made is dead context.
+func stripOldReasoning(messages []client.ChatMessage) []client.ChatMessage {
+	// Count assistant messages from the end to find the cutoff.
+	assistantCount := 0
+	cutoff := 0 // default: clear nothing
+	for i := len(messages) - 1; i >= 0; i-- {
+		if messages[i].Role == "assistant" {
+			assistantCount++
+			if assistantCount == keepReasoning {
+				cutoff = i // clear reasoning on everything before this
+				break
+			}
+		}
+	}
+	// If we have fewer than keepReasoning assistants total,
+	// cutoff stays at 0 — keep all reasoning.
+
+	// Clear reasoning on all assistant messages before the cutoff.
+	for i := 0; i < cutoff; i++ {
+		m := &messages[i]
+		if m.Role == "assistant" && m.ReasoningContent != "" {
+			m.ReasoningContent = ""
+		}
 	}
 
 	return messages
