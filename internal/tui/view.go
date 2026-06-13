@@ -280,12 +280,31 @@ func (m *Model) statusBarView() string {
 
 	helpStr := lipgloss.NewStyle().Foreground(subtextColor).Background(appBgColor).Render("ctrl+h Help")
 
+	// Cache hit rate (DeepSeek/cloud backends with prompt_cache_hit_tokens).
+	var cacheStr string
+	hit := s.Usage.PromptCacheHitTokens
+	miss := s.Usage.PromptCacheMissTokens
+	total := hit + miss
+	if total > 0 {
+		rate := float64(hit) / float64(total) * 100
+		if rate >= 75 {
+			cacheStr = lipgloss.NewStyle().Foreground(lipgloss.Color("#00d700")).Background(appBgColor).Render(fmt.Sprintf("🎯 cache %.0f%%", rate))
+		} else if rate >= 30 {
+			cacheStr = lipgloss.NewStyle().Foreground(warningColor).Background(appBgColor).Render(fmt.Sprintf("📡 cache %.0f%%", rate))
+		} else {
+			cacheStr = lipgloss.NewStyle().Foreground(subtextColor).Background(appBgColor).Render(fmt.Sprintf("cache %.0f%%", rate))
+		}
+	}
+
 	var rightParts []string
 	if attachedStr != "" {
 		rightParts = append(rightParts, attachedStr)
 	}
 	if tokenStr != "" {
 		rightParts = append(rightParts, tokenStr)
+	}
+	if cacheStr != "" {
+		rightParts = append(rightParts, cacheStr)
 	}
 	if breadcrumbStr != "" {
 		rightParts = append(rightParts, breadcrumbStr)
