@@ -70,9 +70,11 @@ func CompactMessages(history []client.ChatMessage, systemPrompt string, tools []
 // later mutated (write_file/target_edit) or re-read more recently.
 // This is the most impactful single compression technique for coding agents.
 func dropSupersededReads(messages []client.ChatMessage) []client.ChatMessage {
-	// Phase A: collect paths mutated by write_file or target_edit.
-	mutated := make(map[string]bool)
-	for _, m := range messages {
+	// Phase A: collect the FIRST mutation index per path.
+	// A read is only superseded if a mutation (write_file/target_edit)
+	// happened AFTER that read. Boolean set loses temporal ordering.
+	firstMutation := make(map[string]int)
+	for i, m := range messages {
 		if m.Role != "assistant" {
 			continue
 		}
@@ -80,12 +82,16 @@ func dropSupersededReads(messages []client.ChatMessage) []client.ChatMessage {
 			if tc.Function.Name != "write_file" && tc.Function.Name != "target_edit" {
 				continue
 			}
-			if p := extractFilePath(tc.Function.Name, tc.Function.Arguments); p != "" {
-				mutated[p] = true
+			p := extractFilePath(tc.Function.Name, tc.Function.Arguments)
+			if p == "" {
+				continue
+			}
+			if _, exists := firstMutation[p]; !exists {
+				firstMutation[p] = i // first write/edit to this file
 			}
 		}
 	}
-	if len(mutated) == 0 {
+	if len(firstMutation) == 0 {
 		return messages // nothing mutated, no superseded reads
 	}
 
@@ -113,6 +119,8 @@ func dropSupersededReads(messages []client.ChatMessage) []client.ChatMessage {
 	}
 
 	// Phase C: elide tool-results that are superseded.
+	// A read is superseded if a mutation happened AFTER it, OR if
+	// there's a newer read of the same file.
 	for i := range messages {
 		m := &messages[i]
 		if m.Role != "tool" || m.ToolCallID == "" {
@@ -122,8 +130,13 @@ func dropSupersededReads(messages []client.ChatMessage) []client.ChatMessage {
 		if !ok {
 			continue
 		}
-		// Elide if file was later mutated OR there's a newer read of same file.
-		if mutated[path] || lastReadIdx[path] > i {
+		// Elide if mutation index > read index (mutation happened AFTER this read)
+		if mtIdx, exists := firstMutation[path]; exists && mtIdx > i {
+			m.Content = client.TextContent(elisionMark)
+			continue
+		}
+		// Elide if there's a newer read of the same file
+		if lastReadIdx[path] > i {
 			m.Content = client.TextContent(elisionMark)
 		}
 	}

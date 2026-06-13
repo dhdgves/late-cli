@@ -65,29 +65,68 @@ func TestDropSupersededReads_NoMutations(t *testing.T) {
 	}
 }
 
+func TestDropSupersededReads_PostWriteReadSurvives(t *testing.T) {
+	// Regression: read → write → read.
+	// The post-write read must NOT be elided — it contains the model's
+	// just-written content that it needs to verify.
+	msgs := []client.ChatMessage{
+		msg("user", "check foo.go then fix it"),
+		msgAssistantWithTools([]client.ToolCall{
+			{ID: "call_0", Function: client.FunctionCall{Name: "read_file", Arguments: `{"path":"foo.go"}`}},
+		}),
+		msgTool("call_0", "buggy code"),
+		msg("assistant", "let me fix"),
+		msgAssistantWithTools([]client.ToolCall{
+			{ID: "call_1", Function: client.FunctionCall{Name: "write_file", Arguments: `{"path":"foo.go"}`}},
+		}),
+		msgTool("call_1", "wrote"),
+		msg("assistant", "let me verify"),
+		msgAssistantWithTools([]client.ToolCall{
+			{ID: "call_2", Function: client.FunctionCall{Name: "read_file", Arguments: `{"path":"foo.go"}`}},
+		}),
+		msgTool("call_2", "fixed code"),
+	}
+
+	result := dropSupersededReads(msgs)
+	// Pre-write read (index 2, "buggy code") should be elided.
+	if result[2].Content.String() != elisionMark {
+		t.Errorf("pre-write read should be elided: got %q", result[2].Content.String())
+	}
+	// Post-write read (index 8, "fixed code") MUST survive.
+	if result[8].Content.String() != "fixed code" {
+		t.Errorf("post-write read MUST survive: got %q", result[8].Content.String())
+	}
+}
+
 func TestDropSupersededReads_WriteThenRead(t *testing.T) {
 	// Model reads foo.go, then writes foo.go, then reads again.
-	// The first read result is stale.
+	// The first read result is stale; the second (post-write) is NOT.
 	msgs := []client.ChatMessage{
 		msg("user", "read foo.go"),
-		msgAssistantWithTools([]client.ToolCall{tc("read_file", `{"path":"foo.go"}`)}),
-		msgTool("call_read_file", "content v1"),
+		{Role: "assistant", ToolCalls: []client.ToolCall{
+			{ID: "call_r1", Function: client.FunctionCall{Name: "read_file", Arguments: `{"path":"foo.go"}`}},
+		}},
+		msgTool("call_r1", "content v1"),
 		msg("assistant", "ok"),
-		msgAssistantWithTools([]client.ToolCall{tc("write_file", `{"path":"foo.go"}`)}),
-		msgTool("call_write_file", "wrote foo.go"),
+		{Role: "assistant", ToolCalls: []client.ToolCall{
+			{ID: "call_w1", Function: client.FunctionCall{Name: "write_file", Arguments: `{"path":"foo.go"}`}},
+		}},
+		msgTool("call_w1", "wrote foo.go"),
 		msg("assistant", "done"),
-		msgAssistantWithTools([]client.ToolCall{tc("read_file", `{"path":"foo.go"}`)}),
-		msgTool("call_read_file_2", "content v2"),
+		{Role: "assistant", ToolCalls: []client.ToolCall{
+			{ID: "call_r2", Function: client.FunctionCall{Name: "read_file", Arguments: `{"path":"foo.go"}`}},
+		}},
+		msgTool("call_r2", "content v2"),
 	}
 
 	result := dropSupersededReads(msgs)
 	// First read (index 2) should be elided: file was later mutated.
 	if result[2].Content.String() != elisionMark {
-		t.Errorf("first read should be elided after write: got %q", result[2].Content.String())
+		t.Errorf("first read (pre-write) should be elided: got %q", result[2].Content.String())
 	}
-	// Second read (index 8) should be kept.
+	// Second read (index 8, AFTER write) should be kept.
 	if result[8].Content.String() != "content v2" {
-		t.Errorf("second read should be kept: got %q", result[8].Content.String())
+		t.Errorf("second read (post-write) should be kept: got %q", result[8].Content.String())
 	}
 }
 
