@@ -142,17 +142,33 @@ func TestDropSupersededReads_Idempotent(t *testing.T) {
 
 // --- Real Session Tests ---
 
-func TestCompactMessages_RealSession_BelowThreshold(t *testing.T) {
+func TestCompactMessages_RealSession_AlwaysRunsSemantic(t *testing.T) {
 	msgs := loadSessionJSON(t, `C:\Users\qxm22\AppData\Roaming\late\sessions\session-20260520-082628.json`)
 	if len(msgs) == 0 {
 		return
 	}
 
-	// With a huge context limit, no compaction should happen.
+	// Even under a huge context limit, semantic elision always runs.
 	result := CompactMessages(msgs, "", nil, 999999)
 	if len(result) != len(msgs) {
-		t.Errorf("no compaction expected under huge limit: %d → %d", len(msgs), len(result))
+		t.Errorf("semantic elision should not change message count: %d → %d", len(msgs), len(result))
 	}
+
+	// Verify all messages are JSON-roundtrippable (elision mark is valid content).
+	for _, m := range result {
+		b, err := json.Marshal(m)
+		if err != nil {
+			t.Errorf("result not JSON-serializable: %v", err)
+			continue
+		}
+		var back client.ChatMessage
+		if err := json.Unmarshal(b, &back); err != nil {
+			t.Errorf("result not JSON-roundtrippable: %v\n  msg: %s", err, b)
+		}
+	}
+
+	total := common.CalculateHistoryTokens(result, "", nil)
+	t.Logf("always-on semantic: %d messages, %d tokens", len(result), total)
 }
 
 func TestCompactMessages_RealSession_SemanticOnly(t *testing.T) {

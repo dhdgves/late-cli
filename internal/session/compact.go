@@ -8,9 +8,10 @@ import (
 )
 
 const (
-	// Thresholds as fraction of context limit.
-	compactNone     = 0.55 // below this: no compaction
-	compactSemantic = 0.70 // below this: semantic elision only; above: batch elision too
+	// compactSemantic triggers batch elision when total tokens exceed this
+	// fraction of the context limit.  Below this, only semantic elision
+	// (dropSupersededReads) runs — which is always-on and lossless.
+	compactSemantic = 0.70
 
 	// keepTail preserves the last N messages from batch elision.
 	keepTail = 24
@@ -19,15 +20,14 @@ const (
 	elisionMark = "[elided — see earlier in conversation]"
 )
 
-// CompactMessages applies a ruthless compaction pipeline to the message
+// CompactMessages applies ruthless context compaction to the message
 // history, reducing token count while preserving essential information.
 //
 // Pipeline:
-//  1. Token estimate → skip if under compactNone threshold
-//  2. dropSupersededReads — elide read_file results whose file was later
-//     mutated by write_file/target_edit, or re-read more recently
-//  3. If still over compactSemantic threshold, batch-elide old tool-results
-//     from the head, preserving the last keepTail messages
+//  1. dropSupersededReads — ALWAYS runs. Elides read_file results whose
+//     file was later mutated by write_file/target_edit. This is lossless.
+//  2. If still over compactSemantic threshold, batch-elide old tool-results
+//     from the head, preserving the last keepTail messages.
 //
 // Returns a new slice; the input is never mutated.
 func CompactMessages(history []client.ChatMessage, systemPrompt string, tools []client.ToolDefinition, contextLimit int) []client.ChatMessage {
@@ -35,24 +35,18 @@ func CompactMessages(history []client.ChatMessage, systemPrompt string, tools []
 		return history // no context info, skip
 	}
 
-	total := common.CalculateHistoryTokens(history, systemPrompt, tools)
-	threshold := int(float64(contextLimit) * compactNone)
-	if total < threshold {
-		return history
-	}
-
 	// Work on a copy.
 	out := make([]client.ChatMessage, len(history))
 	copy(out, history)
 
-	// Stage 1: semantic elision — kill superseded reads.
+	// Stage 1: always run semantic elision — zero-cost, zero-risk.
+	out = dropSupersededReads(out)
+
+	// Stage 2: batch elision only when we're genuinely over threshold.
+	total := common.CalculateHistoryTokens(out, systemPrompt, tools)
 	if total < int(float64(contextLimit)*compactSemantic) {
-		out = dropSupersededReads(out)
 		return out
 	}
-
-	// Stage 2: semantic + batch elision.
-	out = dropSupersededReads(out)
 	out = batchElideToolResults(out, contextLimit, systemPrompt, tools)
 
 	return out
@@ -127,7 +121,7 @@ func dropSupersededReads(messages []client.ChatMessage) []client.ChatMessage {
 // conversation until the token count drops below compactSemantic.
 // system messages and the last keepTail messages are never touched.
 func batchElideToolResults(messages []client.ChatMessage, contextLimit int, systemPrompt string, tools []client.ToolDefinition) []client.ChatMessage {
-	target := int(float64(contextLimit) * compactNone) // aim to get below 55%
+	target := int(float64(contextLimit) * compactSemantic) // aim to get below 70%
 
 	stopIdx := len(messages) - keepTail
 	if stopIdx < 0 {
