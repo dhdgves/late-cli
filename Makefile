@@ -2,7 +2,7 @@
 
 # Project variables
 BINARY_NAME=late-cli.exe
-VERSION?=1.3.0
+VERSION?=1.4.3
 
 # Go compiler flags
 LDFLAGS=-ldflags "-X late/internal/common.Version=${VERSION}"
