@@ -42,12 +42,15 @@ const (
 //
 // Returns a new slice; the input is never mutated.
 func CompactMessages(history []client.ChatMessage, systemPrompt string, tools []client.ToolDefinition, contextLimit int) []client.ChatMessage {
-	if contextLimit <= 0 {
-		return history // no context info, skip
-	}
-
-	// Stage 0: normalize message structure for deterministic KV-cache prefix.
+	// Stage 0: ALWAYS normalize. Even when context information is
+	// unavailable (cloud APIs like DeepSeek have ctxSize=-1), we must
+	// repair the tool-call pairing — unanswered calls from interrupted
+	// sessions will otherwise trigger 400 errors.
 	out := NormalizeMessages(history)
+
+	if contextLimit <= 0 {
+		return out
+	}
 
 	// Stage 1: always run semantic elision — zero-cost, zero-risk.
 	out = dropSupersededReads(out)

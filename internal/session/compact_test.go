@@ -500,7 +500,59 @@ func TestCompact_ZeroLimit_Skip(t *testing.T) {
 	msgs := []client.ChatMessage{msg("user", "hello"), msg("assistant", "hi")}
 	result := CompactMessages(msgs, "", nil, 0)
 	if len(result) != 2 {
-		t.Error("contextLimit=0 should skip and return unchanged")
+		t.Error("contextLimit=0 should run normalization then return")
+	}
+}
+
+// TestCompact_InterruptedMCP_BackfillsUnanswered verifies the fix for
+// "an assistant message with 'tool_calls' must be followed by tool messages" 400 error.
+// When an MCP tool execution is interrupted mid-flight, the session history
+// has an assistant with tool_calls but the following message is "user" not "tool".
+// NormalizeMessages must backfill the missing result even when contextLimit <= 0.
+func TestCompact_InterruptedMCP_BackfillsUnanswered(t *testing.T) {
+	msgs := []client.ChatMessage{
+		msg("user", "search something"),
+		{Role: "assistant", ToolCalls: []client.ToolCall{
+			{ID: "call_interrupted", Function: client.FunctionCall{Name: "codegraph_codegraph_search", Arguments: `{"query":"test"}`}},
+		}},
+		// NO tool result here — the user hit ESC during MCP execution!
+		msg("user", "重新开始任务"),
+	}
+
+	// contextLimit=-1 (cloud API): normalization MUST still run.
+	result := CompactMessages(msgs, "", nil, -1)
+
+	// After normalization, should have 4 messages:
+	// [user, assistant, tool(backfill), user]
+	if len(result) != 4 {
+		t.Fatalf("expected 4 messages (backfilled), got %d", len(result))
+	}
+	if result[2].Role != "tool" {
+		t.Errorf("message 2 should be tool, got %q", result[2].Role)
+	}
+	if result[2].Content.String() != interruptedToolResult {
+		t.Errorf("message 2 should be '%s', got %q", interruptedToolResult, result[2].Content.String())
+	}
+	if result[2].ToolCallID != "call_interrupted" {
+		t.Errorf("backfill should reference call_interrupted, got %q", result[2].ToolCallID)
+	}
+}
+
+func TestCompact_InterruptedMCP_ContextLimitZero(t *testing.T) {
+	// Same as above but with contextLimit=0 (should still normalize).
+	msgs := []client.ChatMessage{
+		msg("user", "go"),
+		{Role: "assistant", ToolCalls: []client.ToolCall{
+			{ID: "call_x", Function: client.FunctionCall{Name: "codegraph_codegraph_files", Arguments: `{}`}},
+		}},
+		msg("user", "cancel"),
+	}
+	result := CompactMessages(msgs, "", nil, 0)
+	if len(result) != 4 {
+		t.Fatalf("expected 4, got %d", len(result))
+	}
+	if result[2].Content.String() != interruptedToolResult {
+		t.Errorf("unanswered call should be backfilled: got %q", result[2].Content.String())
 	}
 }
 
