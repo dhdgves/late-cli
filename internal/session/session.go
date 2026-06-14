@@ -150,9 +150,6 @@ func (s *Session) StartStream(ctx context.Context, extraBody map[string]any) (<-
 	// token count within the model's context window — critical for
 	// KV-cache-constrained local deployments (LM Studio, llama.cpp).
 	ctxLimit := s.client.ContextSize()
-	if ctxLimit <= 0 {
-		ctxLimit = 131072 // default 128K for cloud APIs without /props (DeepSeek, OpenAI)
-	}
 	toolDefs := s.GetToolDefinitions()
 	history := CompactMessages(s.History, s.systemPrompt, toolDefs, ctxLimit)
 

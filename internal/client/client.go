@@ -342,6 +342,12 @@ func (c *Client) ContextSize() int {
 	return c.ctxSize
 }
 
+func (c *Client) SetContextSize(n int) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.ctxSize = n
+}
+
 func (c *Client) IsLlamaCPP() bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()

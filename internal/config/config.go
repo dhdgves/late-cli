@@ -46,6 +46,10 @@ type Config struct {
 	SubagentModel   string `json:"subagent_model,omitempty"`
 
 	SkillsDir string `json:"skills_dir,omitempty"`
+
+	// ContextSize overrides the detected context window size.
+	// 0 = auto-detect (try /props, fall back to 131072).
+	ContextSize int `json:"context_size,omitempty"`
 }
 
 func defaultConfig() Config {

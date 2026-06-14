@@ -208,6 +208,13 @@ func main() {
 	c := client.NewClient(resolvedClientConfig)
 	c.DiscoverBackend(context.Background())
 
+	// Resolve context size: config > /props detection > default 128K.
+	if appConfig != nil && appConfig.ContextSize > 0 {
+		c.SetContextSize(appConfig.ContextSize)
+	} else if c.ContextSize() <= 0 {
+		c.SetContextSize(131072)
+	}
+
 	// Initialize Subagent Client
 	resolvedSubagentConfig := appconfig.ResolveSubagentSettings(appConfig, resolvedOpenAIConfig)
 
