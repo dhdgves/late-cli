@@ -42,13 +42,13 @@ func TestEstimateTokenCount(t *testing.T) {
 		expected int
 	}{
 		{"", 0},
-		{"a", 0},        // 1/3.5 = 0.28 -> 0
-		{"abcd", 1},     // 4/3.5 = 1.14 -> 1
-		{"abcde", 1},    // 5/3.5 = 1.42 -> 1
-		{"12345678", 2}, // 8/3.5 = 2.28 -> 2
-		{"123456789", 2}, // 9/3.5 = 2.57 -> 2
-		{"1234567890", 2}, // 10/3.5 = 2.85 -> 2
-		{"this is a test", 4}, // 14/3.5 = 4.0 -> 4
+		{"a", 0},          // 1/2.0 = 0
+		{"abcd", 2},       // 4/2.0 = 2
+		{"abcde", 2},      // 5/2.0 = 2
+		{"12345678", 4},   // 8/2.0 = 4
+		{"123456789", 4},  // 9/2.0 = 4
+		{"1234567890", 5}, // 10/2.0 = 5
+		{"this is a test", 7}, // 14/2.0 = 7
 	}
 
 	for _, tt := range tests {
@@ -74,13 +74,13 @@ func TestEstimateMessageTokens(t *testing.T) {
 		},
 	}
 
-	// "Hello" = 5 chars -> 1 token
-	// "Thinking..." = 11 chars -> 3 tokens
-	// "test_tool" = 9 chars -> 2 tokens
-	// `{"arg1": "val1"}` = 16 chars -> 4 tokens
-	// Message overhead = 4 tokens
-	// Total = 1 + 3 + 2 + 4 + 4 = 14 tokens
-	expected := 14
+	// "Hello" = 5/2.0 = 2
+	// "Thinking..." = 11/2.0 = 5
+	// "test_tool" = 9/2.0 = 4
+	// `{"arg1": "val1"}` = 16/2.0 = 8
+	// Message overhead = 4
+	// Total = 2 + 5 + 4 + 8 + 4 = 23
+	expected := 23
 	result := EstimateMessageTokens(msg)
 	if result != expected {
 		t.Errorf("EstimateMessageTokens() = %d; want %d", result, expected)
@@ -93,10 +93,9 @@ func TestEstimateEventTokens(t *testing.T) {
 		ReasoningContent: "Reason",
 	}
 
-	// "Part1" = 5 chars -> 1 token
-	// "Reason" = 6 chars -> 1 token
-	// Total = 1 + 1 = 2 tokens
-	expected := 2
+	// "Part1" = 5/2.0 = 2
+	// "Reason" = 6/2.0 = 3
+	expected := 5
 	result := EstimateEventTokens(event)
 	if result != expected {
 		t.Errorf("EstimateEventTokens() = %d; want %d", result, expected)
@@ -116,7 +115,7 @@ func TestCalculateHistoryTokens(t *testing.T) {
 			history:      []client.ChatMessage{},
 			systemPrompt: "You are an assistant",
 			tools:        nil,
-			expected:     15, // "You are an assistant" = 20 chars -> 5 tokens + 10 overhead = 15
+			expected:     20, // "You are an assistant" = 20/2.0 = 10 + 10 overhead = 20
 		},
 		{
 			name: "single user message",
@@ -128,7 +127,7 @@ func TestCalculateHistoryTokens(t *testing.T) {
 			},
 			systemPrompt: "",
 			tools:        nil,
-			expected:     15, // System overhead (10) + msg content (1) + msg overhead (4) = 15
+			expected:     16, // System overhead (10) + msg content (2) + msg overhead (4) = 16
 		},
 	}
 

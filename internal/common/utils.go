@@ -14,12 +14,13 @@ func ReplacePlaceholders(text string, placeholders map[string]string) string {
 }
 
 // EstimateTokenCount estimates the number of tokens in text.
-// Uses a refined approximation: 1 token ≈ 3.5 characters (more accurate for code/English mix).
+// Uses approximate chars-per-token: 2.0 for large-vocab models (qwen, llama3+),
+// which is closer to real tokenizer output than the common 3.5 heuristic.
 func EstimateTokenCount(text string) int {
 	if text == "" {
 		return 0
 	}
-	return int(float64(len(text)) / 3.5)
+	return int(float64(len(text)) / 2.0)
 }
 
 // EstimateToolDefinitionTokens estimates tokens used by tool definitions.
