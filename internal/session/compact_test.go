@@ -360,7 +360,8 @@ func TestNormalize_Empty_NilSafe(t *testing.T) {
 // ============================================================
 
 func TestStripOldReasoning_PreservesLastK(t *testing.T) {
-	msgs := make([]client.ChatMessage, 20)
+	// keepReasoning=3: last 3 assistants keep reasoning.
+	msgs := make([]client.ChatMessage, 10)
 	for i := range msgs {
 		msgs[i] = client.ChatMessage{
 			Role:             "assistant",
@@ -370,14 +371,14 @@ func TestStripOldReasoning_PreservesLastK(t *testing.T) {
 	}
 	result := stripOldReasoning(msgs)
 
-	// Last keepReasoning=12 must have reasoning.
-	for i := 20 - keepReasoning; i < 20; i++ {
+	// Last 3 must have reasoning.
+	for i := 10 - keepReasoning; i < 10; i++ {
 		if result[i].ReasoningContent == "" {
 			t.Errorf("assistant %d reasoning cleared but should be preserved", i)
 		}
 	}
-	// First 8 must be cleared.
-	for i := 0; i < 20-keepReasoning; i++ {
+	// First 7 must be cleared.
+	for i := 0; i < 10-keepReasoning; i++ {
 		if result[i].ReasoningContent != "" {
 			t.Errorf("assistant %d reasoning not cleared", i)
 		}

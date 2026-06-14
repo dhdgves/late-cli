@@ -17,9 +17,9 @@ const (
 	keepTail = 24
 
 	// keepReasoning preserves reasoning content on the last K assistant
-	// messages.  Reasoning older than this was consumed in decisions
+	// messages. Reasoning older than this was consumed in decisions
 	// already made and is dead weight.
-	keepReasoning = 12
+	keepReasoning = 3
 
 	// Elision mark replaces superseded tool results.
 	elisionMark = "[elided — see earlier in conversation]"
@@ -42,28 +42,20 @@ const (
 //
 // Returns a new slice; the input is never mutated.
 func CompactMessages(history []client.ChatMessage, systemPrompt string, tools []client.ToolDefinition, contextLimit int) []client.ChatMessage {
-	// Stage 0: ALWAYS normalize. Even when context information is
-	// unavailable (cloud APIs like DeepSeek have ctxSize=-1), we must
-	// repair the tool-call pairing — unanswered calls from interrupted
-	// sessions will otherwise trigger 400 errors.
+	// Stages 0-2 always run: they are lossless or near-lossless.
 	out := NormalizeMessages(history)
+	out = dropSupersededReads(out)
+	out = stripOldReasoning(out)
 
 	if contextLimit <= 0 {
 		return out
 	}
 
-	// Stage 1: always run semantic elision — zero-cost, zero-risk.
-	out = dropSupersededReads(out)
-
-	// Stage 2: batch elision only when we're genuinely over threshold.
+	// Stage 3: batch elision only when we're genuinely over threshold.
 	total := common.CalculateHistoryTokens(out, systemPrompt, tools)
 	if total < int(float64(contextLimit)*compactSemantic) {
 		return out
 	}
-
-	// Strip old reasoning before batch tool-result elision — it's
-	// the cheaper win (single field clear vs content replacement).
-	out = stripOldReasoning(out)
 	out = batchElideToolResults(out, contextLimit, systemPrompt, tools)
 
 	return out
