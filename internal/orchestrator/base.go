@@ -410,6 +410,10 @@ func (o *BaseOrchestrator) History() []client.ChatMessage {
 	return o.sess.History
 }
 
+func (o *BaseOrchestrator) CompactedTokens() int {
+	return o.sess.LastCompactedTokens
+}
+
 func (o *BaseOrchestrator) Session() *session.Session {
 	return o.sess
 }

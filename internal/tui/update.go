@@ -409,7 +409,8 @@ func (m Model) updateChat(msg tea.Msg) (Model, tea.Cmd) {
 				s.State = StateStreaming
 			}
 			s.Usage = event.Usage
-			// Update token count: use real usage if available, otherwise estimate
+			// Update token count: use compacted count from the session,
+			// not raw history (which may be 3x larger than actual sent tokens).
 			if event.Usage.TotalTokens > 0 {
 				s.CumulativeTokenCount = event.Usage.TotalTokens
 				s.LastRealTokenCount = event.Usage.TotalTokens
@@ -421,7 +422,7 @@ func (m Model) updateChat(msg tea.Msg) (Model, tea.Cmd) {
 				}
 				history := orch.History()
 				if len(history) != s.CachedHistoryLen {
-					s.CachedHistoryTokens = common.CalculateHistoryTokens(history, orch.SystemPrompt(), orch.ToolDefinitions())
+					s.CachedHistoryTokens = orch.CompactedTokens()
 					s.CachedHistoryLen = len(history)
 				}
 				s.CumulativeTokenCount = s.CachedHistoryTokens + common.EstimateEventTokens(event)

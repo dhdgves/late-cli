@@ -32,6 +32,10 @@ type Orchestrator interface {
 	Children() []Orchestrator
 	Parent() Orchestrator
 
+	// CompactedTokens returns the token count after the last compaction
+	// (what was actually sent to the model, not the raw history size).
+	CompactedTokens() int
+
 	// Configuration
 	SetMaxTurns(int)
 	RefreshContextSize(context.Context)

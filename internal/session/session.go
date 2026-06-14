@@ -20,6 +20,11 @@ type Session struct {
 	systemPrompt string
 	useTools     bool
 	Registry     *tool.Registry
+
+	// LastCompactedTokens is the token count AFTER the last compaction,
+	// i.e. what was actually sent to the model. Used by the TUI to show
+	// accurate context usage instead of the raw history size.
+	LastCompactedTokens int
 }
 
 func New(c *client.Client, historyPath string, history []client.ChatMessage, systemPrompt string, useTools bool) *Session {
@@ -152,6 +157,7 @@ func (s *Session) StartStream(ctx context.Context, extraBody map[string]any) (<-
 	ctxLimit := s.client.ContextSize()
 	toolDefs := s.GetToolDefinitions()
 	history := CompactMessages(s.History, s.systemPrompt, toolDefs, ctxLimit)
+	s.LastCompactedTokens = common.CalculateHistoryTokens(history, s.systemPrompt, toolDefs)
 
 	messages := make([]client.ChatMessage, 0, len(history)+1)
 	if s.systemPrompt != "" {
