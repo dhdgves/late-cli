@@ -49,7 +49,7 @@ type Config struct {
 
 	// ContextSize overrides the detected context window size.
 	// 0 = auto-detect (try /props, fall back to 131072).
-	ContextSize int `json:"context_size,omitempty"`
+	ContextSize int `json:"context_size"`
 }
 
 func defaultConfig() Config {
