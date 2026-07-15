@@ -58,6 +58,81 @@ func TestPolicyEngine_Decide_SoftSignals(t *testing.T) {
 	}
 }
 
+func TestPolicyEngine_Decide_DeletionOverridesAllowlist(t *testing.T) {
+	pe := &PolicyEngine{
+		AllowedCommands: map[string]map[string]bool{
+			"rm": {"-rf": true},
+			"remove-item": {"-recurse": true},
+		},
+	}
+	
+	commands := []string{"rm", "rmdir", "unlink", "remove-item", "del", "erase", "rd", "ri"}
+	for _, cmd := range commands {
+		t.Run(cmd, func(t *testing.T) {
+			ir := emptyIR(PlatformUnix)
+			ir.Commands = []string{cmd}
+			if cmd == "rm" {
+				ir.CommandArgs = map[string][]string{"rm": {"-rf"}}
+			} else if cmd == "remove-item" {
+				ir.CommandArgs = map[string][]string{"remove-item": {"-recurse"}}
+			}
+			
+			d := pe.Decide(ir)
+			if !d.NeedsConfirmation {
+				t.Errorf("expected NeedsConfirmation for %v even if allowlisted", cmd)
+			}
+		})
+	}
+}
+
+func TestPolicyEngine_Decide_HighRiskSoftSignalsAlwaysPrompt(t *testing.T) {
+	pe := &PolicyEngine{
+		AllowedCommands: map[string]map[string]bool{
+			"set-content": {"-value": true},
+		},
+	}
+	// Expansions also prompt here because set-content is not an allowed output command
+	for _, rc := range []ReasonCode{ReasonSubshell, ReasonExpansion, ReasonInvokeExpr} {
+		t.Run(string(rc), func(t *testing.T) {
+			ir := emptyIR(PlatformWindows)
+			ir.Commands = []string{"set-content"}
+			ir.CommandArgs = map[string][]string{
+				"set-content": {"-value"},
+			}
+			ir.RiskFlags = []ReasonCode{rc}
+			d := pe.Decide(ir)
+			if !d.NeedsConfirmation {
+				t.Errorf("expected NeedsConfirmation for %v even if command is allowlisted", rc)
+			}
+		})
+	}
+}
+
+func TestPolicyEngine_Decide_AllowlistOverridesSoftSignals(t *testing.T) {
+	pe := &PolicyEngine{
+		AllowedCommands: map[string]map[string]bool{
+			"set-content": {"-value": true},
+		},
+	}
+	for _, rc := range []ReasonCode{ReasonDestructive, ReasonOperator} {
+		t.Run(string(rc), func(t *testing.T) {
+			ir := emptyIR(PlatformWindows)
+			ir.Commands = []string{"set-content"}
+			ir.CommandArgs = map[string][]string{
+				"set-content": {"-value"},
+			}
+			ir.RiskFlags = []ReasonCode{rc}
+			d := pe.Decide(ir)
+			if d.NeedsConfirmation {
+				t.Errorf("expected auto-approve for %v since command is allowlisted", rc)
+			}
+			if d.IsBlocked {
+				t.Errorf("expected not IsBlocked for soft signal %v", rc)
+			}
+		})
+	}
+}
+
 func TestPolicyEngine_Decide_AllowlistedAutoApprove(t *testing.T) {
 	pe := &PolicyEngine{
 		AllowedCommands: map[string]map[string]bool{

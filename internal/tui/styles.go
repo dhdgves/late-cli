@@ -30,12 +30,9 @@ var (
 			Foreground(textColor)
 
 	inputStyle = baseStyle.Copy().
-			Border(lipgloss.NormalBorder(), true, false, false, false).
-			BorderForeground(lipgloss.Color("#232329")).
 			BorderBackground(appBgColor).
 			MarginBackground(appBgColor).
-			Padding(0, 1).
-			Height(InputHeight - 1)
+			Padding(0, 1)
 
 	// User Bubble
 	userMsgStyle = lipgloss.NewStyle().
@@ -127,12 +124,12 @@ var (
 			Bold(true)
 
 	statusAttachedStyle = lipgloss.NewStyle().
-			Foreground(secondaryColor).
-			Background(appBgColor).
-			Bold(true)
+				Foreground(secondaryColor).
+				Background(appBgColor).
+				Bold(true)
 
 	statusTokenStyle = lipgloss.NewStyle().
-			Foreground(subtextColor)
+				Foreground(subtextColor)
 
 	// Breadcrumb styles
 	breadcrumbLateStyle = lipgloss.NewStyle().

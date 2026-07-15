@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"late/internal/common"
 	"late/internal/skill"
+	"sort"
 	"strings"
 )
 
@@ -19,15 +20,22 @@ type ActivateSkillTool struct {
 	Reg    *common.ToolRegistry // kept for backwards compat, no longer used
 }
 
-func (t ActivateSkillTool) Name() string        { return "activate_skill" }
-func (t ActivateSkillTool) Description() string { return "Activate a skill by name to see its instructions and available scripts." }
+func (t ActivateSkillTool) Name() string { return "activate_skill" }
+func (t ActivateSkillTool) Description() string {
+	return "Activate a skill by name to see its instructions and enable its scripts as tools."
+}
 func (t ActivateSkillTool) Parameters() json.RawMessage {
 	names := make([]string, 0, len(t.Skills))
 	var descBuilder strings.Builder
 	descBuilder.WriteString("The name of the skill to activate. Available skills:\n")
 
-	for name, s := range t.Skills {
+	for name := range t.Skills {
 		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	for _, name := range names {
+		s := t.Skills[name]
 		descBuilder.WriteString(fmt.Sprintf("- %s: %s\n", name, s.Metadata.Description))
 	}
 	enumStr, _ := json.Marshal(names)
@@ -65,7 +73,17 @@ func (t ActivateSkillTool) Execute(ctx context.Context, args json.RawMessage) (s
 	instructions = strings.ReplaceAll(instructions, "${{SKILL_DIR}}", s.Path)
 	instructions = strings.ReplaceAll(instructions, "SKILL_DIR", s.Path)
 
-	return instructions, nil
+	refs := skill.DiscoverSkillReferences(s)
+	var resp strings.Builder
+	resp.WriteString(fmt.Sprintf("Skill '%s' activated.\n\nInstructions:\n%s", s.Metadata.Name, s.Instructions))
+	if len(refs) > 0 {
+		resp.WriteString("\n\n## Available References\n")
+		for _, ref := range refs {
+			resp.WriteString(fmt.Sprintf("- `%s`\n", ref))
+		}
+		resp.WriteString("\nTo read a reference file, use the `skill_read_reference` tool with the skill name and file path.\n")
+	}
+	return resp.String(), nil
 }
 
 func (t ActivateSkillTool) RequiresConfirmation(args json.RawMessage) bool { return false }

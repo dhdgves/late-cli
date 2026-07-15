@@ -4,6 +4,19 @@
 
 This guide gets you productive in Late in under 5 minutes.
 
+## Contents
+- [Setup](#setup)
+- [Interface](#interface)
+- [How to Give Good Instructions](#how-to-give-good-instructions)
+- [Tool Approval](#tool-approval)
+- [Configuration](#configuration)
+- [MCP Integration](#mcp-integration)
+- [Agent Skills](#agent-skills)
+- [File Exclusions](#file-exclusions)
+- [Common Flags](#common-flags)
+- [Sessions](#sessions)
+- [Git Worktrees](#git-worktrees)
+
 ## Setup
 
 **1. Set your endpoint** (any OpenAI-compatible API, e.g. llama.cpp, [DeepSeek](https://api-docs.deepseek.com/), [Google](https://ai.google.dev/gemini-api/docs/openai), [Anthropic](https://platform.claude.com/docs/en/api/openai-sdk), [OpenRouter](https://openrouter.ai/docs/quickstart)): 
@@ -56,11 +69,12 @@ Late is a terminal UI with three areas: the **chat viewport** (scrollable histor
 | `Tab` | Switch between agent tabs (orchestrator ↔ subagents) |
 | `Ctrl+A` | Open the file picker to attach files |
 | `Ctrl+X` | Clear all attached files |
+| `Ctrl+H` | Show keyboard help overlay |
 | `Esc` / `Ctrl+G` | Stop the current agent (cancel generation) |
 | `Ctrl+D` / `Ctrl+C` | Quit Late |
 | `Double-click` | Copy message to clipboard |
 
-> **Tip:** Late supports standard terminal editing like `Alt+Arrows` (word jump), `Ctrl+A/E` (start/end), and `Alt+Backspace/Del` (delete word).
+> **Tip:** Late supports standard terminal editing like `Alt+Arrows` (word jump), and `Alt+Backspace/Del` (delete word).
 
 ### File Attachments
 
@@ -194,7 +208,13 @@ Late supports the Model Context Protocol. Add your MCP servers to one of the fol
 * **Global (Windows):** `%APPDATA%\late\skills\`
 * **Project:** `.late/skills/`
 
-There is no further setup required. Just add your skills to the directories and they will be discovered automatically.
+There is no further setup required. Just add your skills to the directories and they will be discovered automatically. Late also supports automatic skill reference discovery.
+
+## File Exclusions
+
+Late's native search tool respects your project's `.gitignore` automatically, saving LLM context by excluding vendor and build directories. 
+
+You can also create an `.llmignore` file alongside your `.gitignore` to specifically hide files from the agent (e.g., secrets, large binaries, test fixtures, or generated code) without affecting your git tracking.
 
 ## Common Flags
 
@@ -202,6 +222,7 @@ There is no further setup required. Just add your skills to the directories and 
 | --- | --- |
 | `--help` | Show all flags and commands |
 | `--version` | Show version information |
+| `--continue` | Resume the previous session |
 | `--gemma-thinking` | Inject thinking tokens for Gemma 4 models |
 | `--subagent-max-turns <n>` | Set max turns per subagent (default: 500) |
 | `--append-system-prompt "..."` | Append text to the system prompt (e.g. further instructions) |

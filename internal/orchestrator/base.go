@@ -364,7 +364,7 @@ func (o *BaseOrchestrator) run() {
 			}
 			break
 		}
-		
+
 		if !hasPending {
 			o.eventCh <- common.StatusEvent{ID: o.id, Status: "idle"}
 			break
@@ -458,6 +458,23 @@ func (o *BaseOrchestrator) Reset() error {
 	o.sess.History = []client.ChatMessage{}
 	return session.SaveHistory(o.sess.HistoryPath, nil)
 }
+
+func (o *BaseOrchestrator) Rewind(index int) error {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if index < 0 || index >= len(o.sess.History) {
+		return fmt.Errorf("invalid history index")
+	}
+	o.sess.History = o.sess.History[:index]
+	if o.sess.HistoryPath != "" {
+		if err := session.SaveHistory(o.sess.HistoryPath, o.sess.History); err != nil {
+			return err
+		}
+		return o.sess.UpdateSessionMetadata()
+	}
+	return nil
+}
+
 
 func (o *BaseOrchestrator) AddChild(child common.Orchestrator) {
 	o.mu.Lock()

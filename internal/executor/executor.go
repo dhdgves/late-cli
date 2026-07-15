@@ -7,8 +7,8 @@ import (
 	"late/internal/client"
 	"late/internal/common"
 	"late/internal/pathutil"
-	"late/internal/skill"
 	"late/internal/session"
+	"late/internal/skill"
 	"late/internal/tool"
 )
 
@@ -18,8 +18,8 @@ import (
 // This replaces the duplicated accumulation logic in tui/state.go (GenerationState.Append)
 // and agent/agent.go (manual accumulation loop).
 type StreamAccumulator struct {
-	Content   string
-	Reasoning string
+	Content      string
+	Reasoning    string
 	ToolCalls    []client.ToolCall
 	Usage        client.Usage
 	FinishReason string
@@ -87,16 +87,16 @@ func ExecuteToolCalls(ctx context.Context, sess *session.Session, toolCalls []cl
 		// Fail-closed: if no confirmation middleware is provided, do not
 		// execute shell commands (they must be explicitly approved by a
 		// middleware such as the TUI confirm middleware).
-if len(middlewares) == 0 {
-				if t := sess.Registry.Get(tc.Function.Name); t != nil {
-					if _, ok := t.(*tool.ShellTool); ok {
-						result := "shell command requires explicit approval before execution"
-						if err := sess.AddToolResultMessage(tc.ID, result); err != nil {
-							return err
-						}
-						continue
+		if len(middlewares) == 0 {
+			if t := sess.Registry.Get(tc.Function.Name); t != nil {
+				if _, ok := t.(*tool.ShellTool); ok {
+					result := "shell command requires explicit approval before execution"
+					if err := sess.AddToolResultMessage(tc.ID, result); err != nil {
+						return err
 					}
+					continue
 				}
+			}
 		}
 
 		result, err := runner(ctx, tc)
@@ -123,6 +123,9 @@ func RegisterTools(reg *tool.Registry, enabledTools map[string]bool, isPlanning 
 	// Always register read-only and base tools
 	if enabledTools["read_file"] {
 		reg.Register(tool.NewReadFileTool())
+	}
+	if enabledTools["search_tool"] {
+		reg.Register(&tool.SearchTool{})
 	}
 	if enabledTools["bash"] {
 		reg.Register(&tool.ShellTool{})
@@ -157,6 +160,9 @@ func RegisterTools(reg *tool.Registry, enabledTools map[string]bool, isPlanning 
 		reg.Register(tool.ActivateSkillTool{
 			Skills: skillMap,
 			Reg:    reg,
+		})
+		reg.Register(tool.SkillReadReferenceTool{
+			Skills: skillMap,
 		})
 	}
 }
@@ -232,7 +238,25 @@ func RunLoop(
 		}
 
 		if acc.FinishReason == "length" {
-			return "", fmt.Errorf("exceeds the available context size")
+			// Determine if this is real context exhaustion or just output truncation
+			// (e.g. max_tokens cap set on the server side).
+			ctxSize := sess.Client().ContextSize()
+			isContextExhausted := ctxSize > 0 && acc.Usage.TotalTokens > 0 &&
+				float64(acc.Usage.TotalTokens) >= float64(ctxSize)*0.95
+
+			if isContextExhausted {
+				return "", fmt.Errorf("exceeds the available context size")
+			}
+
+			// Output was truncated but context is not full — save partial
+			// response and ask the model to continue more concisely.
+			if err := sess.AddAssistantMessageWithTools(acc.Content, acc.Reasoning, nil); err != nil {
+				return "", fmt.Errorf("failed to save history: %w", err)
+			}
+			if err := sess.AddUserMessage("[Output truncated due to length limit. Please continue, but be more concise.]"); err != nil {
+				return "", fmt.Errorf("failed to save history: %w", err)
+			}
+			continue
 		}
 
 		// If stopped, the last tool call might be partially streamed and thus invalid JSON.

@@ -1,6 +1,6 @@
 # Late: High-Leverage AI Agent Orchestration
 
-[English](README.md) | [中文](README.zh-CN.md)
+[English](README.md) | [简体中文](README.zh-CN.md)
 
 > **Fork of [mlhher/late-cli](https://github.com/mlhher/late-cli).** Enhanced for local & cloud efficiency.
 >
@@ -108,6 +108,8 @@ Late manages the KV cache and context window carefully, leaving more room for re
 - **MCP Integration:** Natively map external Model Context Protocol servers directly into Late via standard I/O.
 - **Agent Skills:** Drop in reusable sets of instructions and scripts. Zero configuration or boilerplate required.
 - **Git Worktree Support:** Run independent, parallel agent instances across multiple branches without context bleeding.
+- **Context-Aware Search:** Native search tool that automatically respects `.gitignore` and `.llmignore` to prevent flooding the context window with irrelevant files.
+- **Rich Terminal UI:** Slash commands, input history, commit log viewer, and an interactive keyboard help overlay (`Ctrl+H`).
 - **Gemma 4 Thinking Mode:** Standard wrappers just pipe text to an API, which means they can't trigger Gemma's reasoning. Late includes a dedicated flag to inject the exact tokens required to actually make it think.
 
 ---

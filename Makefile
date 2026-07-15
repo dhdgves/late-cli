@@ -1,8 +1,11 @@
 .PHONY: build test clean install run help
 
 # Project variables
-BINARY_NAME=late-cli.exe
 VERSION?=1.4.3
+BINARY_NAME?=late
+ifeq ($(OS),Windows_NT)
+BINARY_NAME:=late.exe
+endif
 
 # Go compiler flags
 LDFLAGS=-ldflags "-X late/internal/common.Version=${VERSION}"
