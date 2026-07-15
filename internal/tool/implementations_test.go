@@ -223,6 +223,7 @@ func TestBashTool_CWDParameter(t *testing.T) {
 	// Create a subdirectory within the current working directory
 	// Use a subdirectory of the package directory to ensure it's within allowed paths
 	tmpDir := filepath.Join("internal", "tool", "test_cwd")
+	tmpDir = filepath.ToSlash(tmpDir)
 	err := os.MkdirAll(tmpDir, 0755)
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
@@ -589,6 +590,7 @@ func TestBashTool_BinaryOutput(t *testing.T) {
 	// Create a small binary file for testing if /usr/bin/ls is not available or readable
 	tmpDir := t.TempDir()
 	binPath := filepath.Join(tmpDir, "test.bin")
+	binPath = filepath.ToSlash(binPath)
 	err := os.WriteFile(binPath, []byte{0x7f, 0x45, 0x4c, 0x46, 0x01, 0x01, 0x01, 0x00, 0x00}, 0644)
 	if err != nil {
 		t.Fatal(err)

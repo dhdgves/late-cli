@@ -17,6 +17,7 @@ import (
 // the full impact of filtering noise directories.
 func TestGitIgnoreOutputSavings(t *testing.T) {
 	dir := t.TempDir()
+	dir = filepath.ToSlash(dir)
 
 	os.MkdirAll(filepath.Join(dir, ".git"), 0755)
 	os.MkdirAll(filepath.Join(dir, "dist"), 0755)
@@ -80,6 +81,7 @@ func countResultLines(result string) int {
 // 200 noise files (all matching the search pattern).
 func BenchmarkSearchOutputSize(b *testing.B) {
 	dir := b.TempDir()
+	dir = filepath.ToSlash(dir)
 
 	os.MkdirAll(filepath.Join(dir, ".git"), 0755)
 	os.MkdirAll(filepath.Join(dir, "dist"), 0755)
@@ -147,6 +149,7 @@ func BenchmarkSearchOutputSize(b *testing.B) {
 // root resolution.
 func BenchmarkFindRepoRoot(b *testing.B) {
 	dir := b.TempDir()
+	dir = filepath.ToSlash(dir)
 
 	os.MkdirAll(filepath.Join(dir, ".git"), 0755)
 	deepDir := filepath.Join(dir, "a", "b", "c", "d", "e")

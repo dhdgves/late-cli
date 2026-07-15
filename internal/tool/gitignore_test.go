@@ -254,6 +254,7 @@ func TestLoadGitIgnore_FileNotFound(t *testing.T) {
 
 func TestLoadGitIgnore_FromFile(t *testing.T) {
 	dir := t.TempDir()
+	dir = filepath.ToSlash(dir)
 	path := filepath.Join(dir, ".gitignore")
 	os.WriteFile(path, []byte("*.log\nbuild/\n"), 0644)
 
@@ -278,6 +279,7 @@ func TestLoadGitIgnore_FromFile(t *testing.T) {
 
 func TestFindRepoRoot(t *testing.T) {
 	dir := t.TempDir()
+	dir = filepath.ToSlash(dir)
 	os.MkdirAll(filepath.Join(dir, ".git"), 0755)
 	subDir := filepath.Join(dir, "a", "b", "c")
 	os.MkdirAll(subDir, 0755)
@@ -296,6 +298,7 @@ func TestFindRepoRoot(t *testing.T) {
 
 func TestFindRepoRoot_NoGit(t *testing.T) {
 	dir := t.TempDir()
+	dir = filepath.ToSlash(dir)
 	root := FindRepoRoot(dir)
 	if root != "" {
 		t.Errorf("FindRepoRoot without .git should return empty, got %q", root)
@@ -310,6 +313,7 @@ func TestSearchTool_GitIgnoreRespected(t *testing.T) {
 	ResetGitIgnoreCache()
 
 	dir := t.TempDir()
+	dir = filepath.ToSlash(dir)
 
 	// Create a fake repo root with .gitignore
 	os.MkdirAll(filepath.Join(dir, ".git"), 0755)
@@ -342,6 +346,7 @@ func TestSearchTool_GitIgnoreDirectorySkipped(t *testing.T) {
 	ResetGitIgnoreCache()
 
 	dir := t.TempDir()
+	dir = filepath.ToSlash(dir)
 
 	os.MkdirAll(filepath.Join(dir, ".git"), 0755)
 	os.WriteFile(filepath.Join(dir, ".gitignore"), []byte("_private/\n"), 0644)
@@ -371,6 +376,7 @@ func TestSearchTool_NoGitIgnoreDir(t *testing.T) {
 
 	// Searching outside a git repo should work normally
 	dir := t.TempDir()
+	dir = filepath.ToSlash(dir)
 	os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main\n"), 0644)
 
 	tool := &SearchTool{}
@@ -390,6 +396,7 @@ func TestSearchTool_GitIgnoreWithAnchoredPattern(t *testing.T) {
 	ResetGitIgnoreCache()
 
 	dir := t.TempDir()
+	dir = filepath.ToSlash(dir)
 
 	os.MkdirAll(filepath.Join(dir, ".git"), 0755)
 	os.WriteFile(filepath.Join(dir, ".gitignore"), []byte("/dist\n"), 0644)
@@ -437,10 +444,12 @@ func TestGetRepoRoot_CWDKeyedCache(t *testing.T) {
 
 	// Create two separate git repos with different .gitignore rules
 	repo1 := t.TempDir()
+	repo1 = filepath.ToSlash(repo1)
 	os.MkdirAll(filepath.Join(repo1, ".git"), 0755)
 	os.WriteFile(filepath.Join(repo1, ".gitignore"), []byte("*.log\n"), 0644)
 
 	repo2 := t.TempDir()
+	repo2 = filepath.ToSlash(repo2)
 	os.MkdirAll(filepath.Join(repo2, ".git"), 0755)
 	os.WriteFile(filepath.Join(repo2, ".gitignore"), []byte("*.tmp\n"), 0644)
 
@@ -493,6 +502,7 @@ func TestSearchTool_CWDKeyedCache(t *testing.T) {
 	}()
 
 	repo1 := t.TempDir()
+	repo1 = filepath.ToSlash(repo1)
 	os.MkdirAll(filepath.Join(repo1, ".git"), 0755)
 	os.WriteFile(filepath.Join(repo1, ".gitignore"), []byte("*.log\n"), 0644)
 	os.WriteFile(filepath.Join(repo1, "work.go"), []byte("package repo1\n"), 0644)
@@ -500,6 +510,7 @@ func TestSearchTool_CWDKeyedCache(t *testing.T) {
 	os.WriteFile(filepath.Join(repo1, "debug.tmp"), []byte("package debug.tmp\n"), 0644)
 
 	repo2 := t.TempDir()
+	repo2 = filepath.ToSlash(repo2)
 	os.MkdirAll(filepath.Join(repo2, ".git"), 0755)
 	os.WriteFile(filepath.Join(repo2, ".gitignore"), []byte("*.tmp\n"), 0644)
 	os.WriteFile(filepath.Join(repo2, "work.go"), []byte("package repo2\n"), 0644)
@@ -556,6 +567,7 @@ func TestGetGitIgnoreForPath_NestedGitIgnore(t *testing.T) {
 	ResetGitIgnoreCache()
 
 	repo := t.TempDir()
+	repo = filepath.ToSlash(repo)
 	os.MkdirAll(filepath.Join(repo, ".git"), 0755)
 
 	// Root .gitignore ignores *.log
@@ -638,6 +650,7 @@ func TestGetRepoRoot_ConcurrentSafety(t *testing.T) {
 // patterns appended after .gitignore for correct "last matching wins" semantics.
 func TestLoadMergedIgnore_BothExist(t *testing.T) {
 	dir := t.TempDir()
+	dir = filepath.ToSlash(dir)
 	os.WriteFile(filepath.Join(dir, ".gitignore"), []byte("*.log\n"), 0644)
 	os.WriteFile(filepath.Join(dir, ".llmignore"), []byte("*.tmp\n"), 0644)
 
@@ -663,6 +676,7 @@ func TestLoadMergedIgnore_BothExist(t *testing.T) {
 // .llmignore take precedence over .gitignore patterns when merged.
 func TestLoadMergedIgnore_LlmIgnoreNegation(t *testing.T) {
 	dir := t.TempDir()
+	dir = filepath.ToSlash(dir)
 	// .gitignore ignores all .log files
 	os.WriteFile(filepath.Join(dir, ".gitignore"), []byte("*.log\n"), 0644)
 	// .llmignore un-ignores important.log
@@ -690,6 +704,7 @@ func TestLoadMergedIgnore_LlmIgnoreNegation(t *testing.T) {
 // only .gitignore exists (backward compatible).
 func TestLoadMergedIgnore_GitIgnoreOnly(t *testing.T) {
 	dir := t.TempDir()
+	dir = filepath.ToSlash(dir)
 	os.WriteFile(filepath.Join(dir, ".gitignore"), []byte("*.log\n"), 0644)
 
 	gi, err := loadMergedIgnore(dir)
@@ -708,6 +723,7 @@ func TestLoadMergedIgnore_GitIgnoreOnly(t *testing.T) {
 // only .llmignore exists (no .gitignore at all).
 func TestLoadMergedIgnore_LlmIgnoreOnly(t *testing.T) {
 	dir := t.TempDir()
+	dir = filepath.ToSlash(dir)
 	os.WriteFile(filepath.Join(dir, ".llmignore"), []byte("*.tmp\n"), 0644)
 
 	gi, err := loadMergedIgnore(dir)
@@ -729,6 +745,7 @@ func TestLoadMergedIgnore_LlmIgnoreOnly(t *testing.T) {
 // when neither .gitignore nor .llmignore exists.
 func TestLoadMergedIgnore_Neither(t *testing.T) {
 	dir := t.TempDir()
+	dir = filepath.ToSlash(dir)
 	gi, err := loadMergedIgnore(dir)
 	if err != nil {
 		t.Fatal(err)
@@ -744,6 +761,7 @@ func TestSearchTool_LlmIgnoreFilters(t *testing.T) {
 	ResetGitIgnoreCache()
 
 	dir := t.TempDir()
+	dir = filepath.ToSlash(dir)
 	os.MkdirAll(filepath.Join(dir, ".git"), 0755)
 
 	// Only .llmignore, no .gitignore — ignore .tmp files
@@ -773,6 +791,7 @@ func TestSearchTool_GitIgnoreAndLlmIgnore(t *testing.T) {
 	ResetGitIgnoreCache()
 
 	dir := t.TempDir()
+	dir = filepath.ToSlash(dir)
 	os.MkdirAll(filepath.Join(dir, ".git"), 0755)
 
 	// .gitignore ignores *.log
@@ -809,6 +828,7 @@ func TestSearchTool_LlmIgnoreNested(t *testing.T) {
 	ResetGitIgnoreCache()
 
 	repo := t.TempDir()
+	repo = filepath.ToSlash(repo)
 	os.MkdirAll(filepath.Join(repo, ".git"), 0755)
 
 	// Root has .gitignore only
@@ -825,6 +845,7 @@ func TestSearchTool_LlmIgnoreNested(t *testing.T) {
 	tool := &SearchTool{}
 
 	// Search the nested sub-directory specifically
+	subDir = filepath.ToSlash(subDir)
 	args := json.RawMessage(`{"pattern": "package", "path": "` + subDir + `", "output_mode": "files_with_matches"}`)
 	result, err := tool.Execute(context.Background(), args)
 	if err != nil {

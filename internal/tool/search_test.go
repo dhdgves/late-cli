@@ -162,6 +162,7 @@ func TestSearchTool_MaxResultsCapping(t *testing.T) {
 	// We can't easily inspect the internal capped value, but we can verify
 	// that a value > 500 doesn't cause errors when run against a real dir.
 	tmpDir := t.TempDir()
+	tmpDir = filepath.ToSlash(tmpDir)
 	os.WriteFile(filepath.Join(tmpDir, "a.go"), []byte("func A() {}\n"), 0644)
 
 	tests := []struct {
@@ -196,6 +197,7 @@ func TestSearchTool_MaxResultsCapping(t *testing.T) {
 
 func TestSearchTool_NoMatches(t *testing.T) {
 	tmpDir := t.TempDir()
+	tmpDir = filepath.ToSlash(tmpDir)
 	os.WriteFile(filepath.Join(tmpDir, "test.txt"), []byte("hello world\n"), 0644)
 
 	tool := &SearchTool{}
@@ -211,6 +213,7 @@ func TestSearchTool_NoMatches(t *testing.T) {
 
 func TestSearchTool_FilesWithMatchesMode(t *testing.T) {
 	tmpDir := t.TempDir()
+	tmpDir = filepath.ToSlash(tmpDir)
 	aPath := filepath.Join(tmpDir, "a.go")
 	bPath := filepath.Join(tmpDir, "b.go")
 	os.WriteFile(aPath, []byte("package a\nfunc Foo() {}\n"), 0644)
@@ -237,6 +240,7 @@ func TestSearchTool_FilesWithMatchesMode(t *testing.T) {
 
 func TestSearchTool_ContentMode_ExactFormat(t *testing.T) {
 	tmpDir := t.TempDir()
+	tmpDir = filepath.ToSlash(tmpDir)
 	// Two-line file where line 2 has the match
 	content := "package a\nfunc Foo() {}\n"
 	os.WriteFile(filepath.Join(tmpDir, "a.go"), []byte(content), 0644)
@@ -260,6 +264,7 @@ func TestSearchTool_ContentMode_ExactFormat(t *testing.T) {
 
 func TestSearchTool_ContentMode_NoMatchesInFile(t *testing.T) {
 	tmpDir := t.TempDir()
+	tmpDir = filepath.ToSlash(tmpDir)
 	os.WriteFile(filepath.Join(tmpDir, "a.go"), []byte("package a\nfunc Foo() {}\n"), 0644)
 	os.WriteFile(filepath.Join(tmpDir, "b.go"), []byte("package b\n"), 0644)
 
@@ -281,6 +286,7 @@ func TestSearchTool_ContentMode_NoMatchesInFile(t *testing.T) {
 
 func TestSearchTool_CountMode_ExactCounts(t *testing.T) {
 	tmpDir := t.TempDir()
+	tmpDir = filepath.ToSlash(tmpDir)
 	// a.go has 2 'func' matches, b.go has 1
 	os.WriteFile(filepath.Join(tmpDir, "a.go"), []byte("package a\nfunc Foo() {}\nfunc Bar() {}\n"), 0644)
 	os.WriteFile(filepath.Join(tmpDir, "b.go"), []byte("package b\nfunc Baz() {}\n"), 0644)
@@ -322,6 +328,7 @@ func TestSearchTool_CountMode_ExactCounts(t *testing.T) {
 
 func TestSearchTool_CaseInsensitiveDefault(t *testing.T) {
 	tmpDir := t.TempDir()
+	tmpDir = filepath.ToSlash(tmpDir)
 	os.WriteFile(filepath.Join(tmpDir, "a.go"), []byte("func Foo() {}\n"), 0644)
 
 	tool := &SearchTool{}
@@ -338,6 +345,7 @@ func TestSearchTool_CaseInsensitiveDefault(t *testing.T) {
 
 func TestSearchTool_CaseSensitive(t *testing.T) {
 	tmpDir := t.TempDir()
+	tmpDir = filepath.ToSlash(tmpDir)
 	os.WriteFile(filepath.Join(tmpDir, "a.go"), []byte("func Foo() {}\n"), 0644)
 
 	tool := &SearchTool{}
@@ -368,6 +376,7 @@ func TestSearchTool_CaseSensitive(t *testing.T) {
 
 func TestSearchTool_FixedStringsLiteral(t *testing.T) {
 	tmpDir := t.TempDir()
+	tmpDir = filepath.ToSlash(tmpDir)
 	// File containing literal parentheses — "hello(world)" will work for both literal and regex matching
 	os.WriteFile(filepath.Join(tmpDir, "a.go"), []byte("hello(world)\n"), 0644)
 
@@ -408,6 +417,7 @@ func TestSearchTool_FixedStringsLiteral(t *testing.T) {
 
 func TestSearchTool_FixedStringsCaseInsensitive(t *testing.T) {
 	tmpDir := t.TempDir()
+	tmpDir = filepath.ToSlash(tmpDir)
 	os.WriteFile(filepath.Join(tmpDir, "a.go"), []byte("Hello World\n"), 0644)
 
 	tool := &SearchTool{}
@@ -439,6 +449,7 @@ func TestSearchTool_FixedStringsCaseInsensitive(t *testing.T) {
 
 func TestSearchTool_IncludeFilter(t *testing.T) {
 	tmpDir := t.TempDir()
+	tmpDir = filepath.ToSlash(tmpDir)
 	os.WriteFile(filepath.Join(tmpDir, "a.go"), []byte("func A() {}\n"), 0644)
 	os.WriteFile(filepath.Join(tmpDir, "a.ts"), []byte("function A() {}\n"), 0644)
 	os.WriteFile(filepath.Join(tmpDir, "a.py"), []byte("def A():\n"), 0644)
@@ -478,6 +489,7 @@ func TestSearchTool_IncludeFilter(t *testing.T) {
 
 func TestSearchTool_IncludeFilterNoMatch(t *testing.T) {
 	tmpDir := t.TempDir()
+	tmpDir = filepath.ToSlash(tmpDir)
 	os.WriteFile(filepath.Join(tmpDir, "a.go"), []byte("func A() {}\n"), 0644)
 
 	tool := &SearchTool{}
@@ -498,6 +510,7 @@ func TestSearchTool_IncludeFilterNoMatch(t *testing.T) {
 
 func TestSearchTool_ContextLines(t *testing.T) {
 	tmpDir := t.TempDir()
+	tmpDir = filepath.ToSlash(tmpDir)
 	content := "line1\nline2\nline3 MATCH\nline4\nline5\n"
 	os.WriteFile(filepath.Join(tmpDir, "a.txt"), []byte(content), 0644)
 
@@ -520,6 +533,7 @@ func TestSearchTool_ContextLines(t *testing.T) {
 
 func TestSearchTool_ContextLinesZero(t *testing.T) {
 	tmpDir := t.TempDir()
+	tmpDir = filepath.ToSlash(tmpDir)
 	content := "line1\nline2 MATCH\nline3\n"
 	os.WriteFile(filepath.Join(tmpDir, "a.txt"), []byte(content), 0644)
 
@@ -559,6 +573,7 @@ func TestSearchTool_DefaultPathIsCWD(t *testing.T) {
 
 func TestSearchTool_HiddenFilesSkipped(t *testing.T) {
 	tmpDir := t.TempDir()
+	tmpDir = filepath.ToSlash(tmpDir)
 	os.WriteFile(filepath.Join(tmpDir, ".hidden.go"), []byte("func secret() {}\n"), 0644)
 	os.WriteFile(filepath.Join(tmpDir, "visible.go"), []byte("func visible() {}\n"), 0644)
 
@@ -579,6 +594,7 @@ func TestSearchTool_HiddenFilesSkipped(t *testing.T) {
 
 func TestSearchTool_VendorDirSkipped(t *testing.T) {
 	tmpDir := t.TempDir()
+	tmpDir = filepath.ToSlash(tmpDir)
 	os.MkdirAll(filepath.Join(tmpDir, "node_modules", "pkg"), 0755)
 	os.WriteFile(filepath.Join(tmpDir, "node_modules", "pkg", "lib.js"), []byte("function foo() {}\n"), 0644)
 	os.WriteFile(filepath.Join(tmpDir, "main.js"), []byte("function bar() {}\n"), 0644)
@@ -600,6 +616,7 @@ func TestSearchTool_VendorDirSkipped(t *testing.T) {
 
 func TestSearchTool_GitDirSkipped(t *testing.T) {
 	tmpDir := t.TempDir()
+	tmpDir = filepath.ToSlash(tmpDir)
 	os.MkdirAll(filepath.Join(tmpDir, ".git", "objects"), 0755)
 	os.WriteFile(filepath.Join(tmpDir, ".git", "objects", "pack"), []byte("binary data\n"), 0644)
 	os.WriteFile(filepath.Join(tmpDir, "main.go"), []byte("func main() {}\n"), 0644)
@@ -625,6 +642,7 @@ func TestSearchTool_GitDirSkipped(t *testing.T) {
 
 func TestSearchTool_BinarySkip(t *testing.T) {
 	tmpDir := t.TempDir()
+	tmpDir = filepath.ToSlash(tmpDir)
 	// File with null byte = binary
 	binaryContent := []byte("some text\x00more text\n")
 	os.WriteFile(filepath.Join(tmpDir, "binary.bin"), binaryContent, 0644)
@@ -651,6 +669,7 @@ func TestSearchTool_BinarySkip(t *testing.T) {
 
 func TestSearchTool_FileCapTruncation(t *testing.T) {
 	tmpDir := t.TempDir()
+	tmpDir = filepath.ToSlash(tmpDir)
 	for i := 0; i < 150; i++ {
 		os.WriteFile(filepath.Join(tmpDir, fmt.Sprintf("file%d.go", i)),
 			[]byte(fmt.Sprintf("package p%d\nfunc F%d() {}\n", i, i)), 0644)
@@ -683,6 +702,7 @@ func TestSearchTool_FileCapTruncation(t *testing.T) {
 
 func TestSearchTool_CharCapTruncation(t *testing.T) {
 	tmpDir := t.TempDir()
+	tmpDir = filepath.ToSlash(tmpDir)
 	// Create many files, each with a match. 500 files × ~70 chars/file = 35K > 32K maxSearchChars.
 	for i := 0; i < 500; i++ {
 		content := fmt.Sprintf("package p%d\n// line with MATCH keyword number %d\nfunc F%d() {}\n", i, i, i)
@@ -709,6 +729,7 @@ func TestSearchTool_CharCapTruncation(t *testing.T) {
 
 func TestSearchTool_LongLineTruncation(t *testing.T) {
 	tmpDir := t.TempDir()
+	tmpDir = filepath.ToSlash(tmpDir)
 	longLine := strings.Repeat("x", 2000) + "MATCH\n"
 	os.WriteFile(filepath.Join(tmpDir, "long.txt"), []byte(longLine), 0644)
 
@@ -751,6 +772,7 @@ func TestSearchTool_NonexistentPath(t *testing.T) {
 
 func TestSearchTool_ContextCancellation(t *testing.T) {
 	tmpDir := t.TempDir()
+	tmpDir = filepath.ToSlash(tmpDir)
 	for i := 0; i < 100; i++ {
 		os.WriteFile(filepath.Join(tmpDir, fmt.Sprintf("file%d.go", i)),
 			[]byte(fmt.Sprintf("package p%d\nfunc F%d() {}\n", i, i)), 0644)
@@ -776,6 +798,7 @@ func TestSearchTool_ContextCancellation(t *testing.T) {
 
 func TestSearchTool_RegexpSpecialChars(t *testing.T) {
 	tmpDir := t.TempDir()
+	tmpDir = filepath.ToSlash(tmpDir)
 	os.WriteFile(filepath.Join(tmpDir, "a.go"), []byte("a.b\n"), 0644)
 
 	tool := &SearchTool{}
@@ -865,6 +888,7 @@ func TestTruncateLine(t *testing.T) {
 
 func TestCountMatches(t *testing.T) {
 	tmpDir := t.TempDir()
+	tmpDir = filepath.ToSlash(tmpDir)
 
 	// File with known content
 	path := filepath.Join(tmpDir, "test.go")
@@ -885,6 +909,7 @@ func TestCountMatches(t *testing.T) {
 
 func TestCountMatches_NoMatches(t *testing.T) {
 	tmpDir := t.TempDir()
+	tmpDir = filepath.ToSlash(tmpDir)
 	path := filepath.Join(tmpDir, "test.go")
 	os.WriteFile(path, []byte("package main\n"), 0644)
 
@@ -903,6 +928,7 @@ func TestCountMatches_NoMatches(t *testing.T) {
 
 func TestCountMatches_BinaryFile(t *testing.T) {
 	tmpDir := t.TempDir()
+	tmpDir = filepath.ToSlash(tmpDir)
 	path := filepath.Join(tmpDir, "binary.bin")
 	os.WriteFile(path, []byte("text\x00more\n"), 0644)
 
@@ -931,6 +957,7 @@ func TestCountMatches_NonexistentFile(t *testing.T) {
 
 func TestCountMatches_EmptyFile(t *testing.T) {
 	tmpDir := t.TempDir()
+	tmpDir = filepath.ToSlash(tmpDir)
 	path := filepath.Join(tmpDir, "empty.go")
 	os.WriteFile(path, []byte{}, 0644)
 
@@ -950,6 +977,7 @@ func TestCountMatches_EmptyFile(t *testing.T) {
 
 func TestSearchTool_DefaultOutputMode(t *testing.T) {
 	tmpDir := t.TempDir()
+	tmpDir = filepath.ToSlash(tmpDir)
 	os.WriteFile(filepath.Join(tmpDir, "a.go"), []byte("package a\n"), 0644)
 
 	tool := &SearchTool{}
@@ -974,6 +1002,7 @@ func TestSearchTool_DefaultOutputMode(t *testing.T) {
 
 func TestSearchTool_ContentModeMultipleFiles(t *testing.T) {
 	tmpDir := t.TempDir()
+	tmpDir = filepath.ToSlash(tmpDir)
 	os.WriteFile(filepath.Join(tmpDir, "a.go"), []byte("package a\nfunc A() {}\n"), 0644)
 	os.WriteFile(filepath.Join(tmpDir, "b.go"), []byte("package b\nfunc B() {}\n"), 0644)
 
